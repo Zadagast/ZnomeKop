@@ -62,6 +62,16 @@ PlaydateSDK/      # local SDK (gitignored) or set PLAYDATE_SDK_PATH
 
 ## Easiest: run the prebuilt game (Ubuntu)
 
+**Can't ship the Playdate SDK in git** — Panic's license forbids redistributing it.
+
+If you don't have the SDK yet:
+
+```bash
+./install-sdk-ubuntu.sh
+source ~/.bashrc
+./run-local.sh
+```
+
 A compiled game is committed as `ZnomeKop.pdx` (also `ZnomeKop.pdx.zip`).
 
 ```bash
