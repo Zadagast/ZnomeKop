@@ -1,0 +1,27 @@
+# Playdate SDK (download separately; see README)
+PlaydateSDK
+PlaydateSDK-*
+PlaydateSDK*.tar.gz
+
+# Build output
+*.pdx
+.source
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+.nova/
+*.swp
+*~
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Local tooling
+*.log
+.cache/
