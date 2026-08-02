@@ -3,11 +3,7 @@ PlaydateSDK
 PlaydateSDK-*
 PlaydateSDK*.tar.gz
 
-# Build output (keep the ready-to-run game committed)
-*.pdx
-!ZnomeKop.pdx/
-!ZnomeKop.pdx/**
-!.source
+# Don't ignore the shipped playable build
 .source
 
 # OS / editor
