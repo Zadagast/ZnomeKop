@@ -1,32 +1,30 @@
 -- Data-driven Mars tile definitions.
--- Indices match source/images/tiles-table-16-16.png (1-based).
+-- Ids are 1-based and must match build_tile_list() in tools/make_tiles.py.
 
 Tiles = {
     EMPTY = 1,
-    ROCK = 2,       -- packed path / open plain
-    DUST = 3,       -- dust plain
-    CANYON = 4,
-    LAVA = 5,
-    BOULDER = 6,    -- boulder cluster obstacle
-    COLONY = 7,     -- town plaza
-    WALL = 8,       -- mountain / cliff
-    OUTPOST = 9,
-    LAB = 10,
-    TUBE = 11,
-    RUINS = 12,
-    ENCOUNTER = 13, -- dustreed (tall-grass equivalent)
-    DOME = 14,
-    WALKWAY = 15,
-    CRATER = 16,
-    SPIRE = 17,     -- silica spire blocker (tree stand-in)
-    POOL_TL = 18,   -- 2x2 brine pool corners (solid)
-    POOL_TR = 19,
-    POOL_BL = 20,
-    POOL_BR = 21,
-    BUILDING = 22,   -- solid footprint under 96x64 building props
-    DUST_B = 23,     -- regolith variants; identical rules, different grit
-    DUST_C = 24,
-    CLIFF_FACE = 25, -- cliff body below a cliff top
+    ROCK = 2,        -- route / packed path
+    DUST = 3,        -- regolith plain
+    CANYON = 4,      -- eroded strata
+    BOULDER = 5,     -- boulder cluster obstacle
+    COLONY = 6,      -- town plaza
+    WALL = 7,        -- cliff top
+    OUTPOST = 8,
+    LAB = 9,
+    TUBE = 10,
+    RUINS = 11,
+    ENCOUNTER = 12,  -- dustreed (tall-grass equivalent)
+    DOME = 13,       -- supply crates (town landmark)
+    CRATER = 14,
+    SPIRE = 15,      -- silica spire blocker (tree stand-in)
+    POOL_TL = 16,    -- 2x2 brine pool corners (solid)
+    POOL_TR = 17,
+    POOL_BL = 18,
+    POOL_BR = 19,
+    BUILDING = 20,   -- solid footprint under 96x64 building props
+    DUST_B = 21,     -- regolith detail variants; same rules as DUST
+    DUST_C = 22,
+    CLIFF_FACE = 23, -- cliff body below a cliff top
 }
 
 Tiles.Info = {
@@ -34,7 +32,6 @@ Tiles.Info = {
     [Tiles.ROCK] = { name = "Route", solid = false, encounter = 0.0, poi = false },
     [Tiles.DUST] = { name = "Regolith", solid = false, encounter = 0.04, poi = false },
     [Tiles.CANYON] = { name = "Strata", solid = false, encounter = 0.06, poi = false },
-    [Tiles.LAVA] = { name = "Vent Field", solid = false, encounter = 0.08, poi = false },
     [Tiles.BOULDER] = { name = "Boulders", solid = true, encounter = 0, poi = false },
     [Tiles.COLONY] = { name = "Colony Plaza", solid = false, encounter = 0.0, poi = false },
     [Tiles.WALL] = { name = "Cliff", solid = true, encounter = 0, poi = false },
@@ -43,8 +40,7 @@ Tiles.Info = {
     [Tiles.TUBE] = { name = "Lava Tube", solid = false, encounter = 0.0, poi = true, poiType = "tube" },
     [Tiles.RUINS] = { name = "Ruins", solid = false, encounter = 0.05, poi = true, poiType = "ruins" },
     [Tiles.ENCOUNTER] = { name = "Dustreed", solid = false, encounter = 0.22, poi = false },
-    [Tiles.DOME] = { name = "Dome Court", solid = false, encounter = 0.0, poi = false },
-    [Tiles.WALKWAY] = { name = "Walkway", solid = false, encounter = 0.0, poi = false },
+    [Tiles.DOME] = { name = "Supply Crates", solid = true, encounter = 0.0, poi = false },
     [Tiles.CRATER] = { name = "Crater Rim", solid = false, encounter = 0.05, poi = false },
     [Tiles.SPIRE] = { name = "Silica Spire", solid = true, encounter = 0, poi = false },
     [Tiles.POOL_TL] = { name = "Brine Pool", solid = true, encounter = 0, poi = false },
@@ -75,16 +71,14 @@ Tiles.Ground = {
     Tiles.DUST_B,
     Tiles.DUST_C,
     Tiles.CANYON,
-    Tiles.LAVA,
     Tiles.CRATER,
 }
 
 Tiles.Groups = {
     arid = { Tiles.ROCK, Tiles.DUST, Tiles.CRATER, Tiles.ENCOUNTER },
     canyon = { Tiles.CANYON, Tiles.ROCK, Tiles.DUST },
-    volcanic = { Tiles.LAVA, Tiles.ROCK, Tiles.CRATER },
-    cold = { Tiles.BOULDER, Tiles.ROCK, Tiles.DUST },
-    built = { Tiles.COLONY, Tiles.WALKWAY, Tiles.DOME, Tiles.OUTPOST, Tiles.LAB, Tiles.RUINS },
+    rocky = { Tiles.BOULDER, Tiles.ROCK, Tiles.CRATER },
+    built = { Tiles.COLONY, Tiles.DOME, Tiles.OUTPOST, Tiles.LAB, Tiles.RUINS },
 }
 
 function Tiles.isSolid(tileId)

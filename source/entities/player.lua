@@ -11,12 +11,14 @@ local STEP_FRAMES = 8
 Player = {}
 Player.__index = Player
 
--- imagetable: down0, down1, up0, up1, left0, left1, right0, right1
+-- imagetable holds three poses per facing: neutral, step-left, step-right
+local NEUTRAL, STEP_A, STEP_B = 1, 2, 3
+
 local FRAME = {
-    down = { 1, 2 },
-    up = { 3, 4 },
-    left = { 5, 6 },
-    right = { 7, 8 },
+    down = { 1, 2, 3 },
+    up = { 4, 5, 6 },
+    left = { 7, 8, 9 },
+    right = { 10, 11, 12 },
 }
 
 function Player.new(tileX, tileY)
@@ -36,7 +38,7 @@ function Player.new(tileX, tileY)
     self.images = gfx.imagetable.new("images/player")
     assert(self.images, "Missing images/player imagetable")
 
-    self.sprite = gfx.sprite.new(self.images:getImage(FRAME.down[1]))
+    self.sprite = gfx.sprite.new(self.images:getImage(FRAME.down[NEUTRAL]))
     self.sprite:setCenter(0.5, 1.0) -- feet anchored for 2.5D sorting
     self:syncSprite()
     self.sprite:add()
@@ -45,13 +47,15 @@ end
 
 function Player:currentFrame()
     local frames = FRAME[self.facing]
-    local idx = 1
-    if self.moving then
-        idx = (self.moveTime // 4) % 2 + 1
-    else
-        idx = (self.stepParity % 2) + 1
+    if not self.moving then
+        return frames[NEUTRAL]
     end
-    return frames[idx]
+    -- Alternate feet per tile stepped, and pass through neutral at the
+    -- midpoint of each step so the gait has a contact-passing rhythm.
+    if self.moveTime * 2 < STEP_FRAMES then
+        return frames[(self.stepParity % 2 == 0) and STEP_A or STEP_B]
+    end
+    return frames[NEUTRAL]
 end
 
 function Player:syncSprite()

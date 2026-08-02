@@ -158,8 +158,6 @@ function World:rollEncounter()
             habitat = "dust"
         elseif tile == Tiles.CANYON then
             habitat = "canyon"
-        elseif tile == Tiles.LAVA then
-            habitat = "lava"
         elseif tile == Tiles.RUINS then
             habitat = "ruins"
         elseif tile == Tiles.CRATER then

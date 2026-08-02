@@ -88,10 +88,6 @@ def tile_plaza() -> Image.Image:
     return sprites.plaza_tile()
 
 
-def tile_walkway() -> Image.Image:
-    return sprites.walkway_tile()
-
-
 def tile_cliff_top() -> Image.Image:
     return sprites.cliff_top_tile()
 
@@ -119,10 +115,6 @@ def tile_crater() -> Image.Image:
 
 def tile_cave() -> Image.Image:
     return terrain("cave")
-
-
-def tile_vent() -> Image.Image:
-    return terrain("vent")
 
 
 def tile_strata() -> Image.Image:
@@ -278,31 +270,29 @@ def save_table_alpha(frames: list[Image.Image], path: Path) -> None:
 def build_tile_list() -> list[Image.Image]:
     # Order must match Tiles ids in source/data/tiles.lua
     return [
-        tile_empty(),           # 1 EMPTY
-        tile_route(),           # 2 ROCK route
-        tile_ground(0),         # 3 DUST regolith A
-        tile_strata(),          # 4 CANYON
-        tile_vent(),            # 5 LAVA vent field
-        tile_boulder(),         # 6 FROST -> boulder scatter
-        tile_plaza(),           # 7 COLONY
-        tile_cliff_top(),       # 8 WALL cliff top
-        tile_plaza(),           # 9 OUTPOST door pad
-        tile_plaza(),           # 10 LAB door pad
-        tile_cave(),            # 11 TUBE
-        tile_ground(2),         # 12 RUINS door pad
-        tile_dustreed(),        # 13 ENCOUNTER
-        tile_pad(),             # 14 DOME landing pad
-        tile_walkway(),         # 15 WALKWAY
-        tile_crater(),          # 16 CRATER
-        tile_spire(),           # 17 SPIRE
-        tile_pool("tl"),        # 18 POOL_TL
-        tile_pool("tr"),        # 19 POOL_TR
-        tile_pool("bl"),        # 20 POOL_BL
-        tile_pool("br"),        # 21 POOL_BR
-        tile_under_building(),  # 22 BUILDING footprint
-        tile_ground(1),         # 23 DUST_B
-        tile_ground(2),         # 24 DUST_C
-        tile_cliff_face(),      # 25 CLIFF_FACE
+        tile_empty(),           # 1  EMPTY
+        tile_route(),           # 2  ROCK route
+        tile_ground(0),         # 3  DUST regolith (plain)
+        tile_strata(),          # 4  CANYON
+        tile_boulder(),         # 5  BOULDER
+        tile_plaza(),           # 6  COLONY
+        tile_cliff_top(),       # 7  WALL cliff top
+        tile_plaza(),           # 8  OUTPOST door pad
+        tile_plaza(),           # 9  LAB door pad
+        tile_cave(),            # 10 TUBE
+        tile_ground(2),         # 11 RUINS door pad
+        tile_dustreed(),        # 12 ENCOUNTER
+        tile_pad(),             # 13 DOME supply crates
+        tile_crater(),          # 14 CRATER
+        tile_spire(),           # 15 SPIRE
+        tile_pool("tl"),        # 16 POOL_TL
+        tile_pool("tr"),        # 17 POOL_TR
+        tile_pool("bl"),        # 18 POOL_BL
+        tile_pool("br"),        # 19 POOL_BR
+        tile_under_building(),  # 20 BUILDING footprint
+        tile_ground(1),         # 21 DUST_B
+        tile_ground(2),         # 22 DUST_C
+        tile_cliff_face(),      # 23 CLIFF_FACE
     ]
 
 

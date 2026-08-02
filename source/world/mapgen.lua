@@ -20,15 +20,23 @@ local DIRS = {
 
 local function isGround(tile)
     return Tiles.isDust(tile) or tile == Tiles.CANYON
-        or tile == Tiles.CRATER or tile == Tiles.LAVA
+        or tile == Tiles.CRATER
 end
 
--- Scatter regolith variants so open terrain does not show a 32px grid.
+-- Sprinkle detail into the regolith. Mostly plain so open fields stay calm;
+-- roughly one tile in five carries a rock or a crack.
 local function scatterGround(grid, rng)
     for y = 2, grid.height - 1 do
         for x = 2, grid.width - 1 do
             if Tiles.isDust(Grid.get(grid, x, y)) then
-                Grid.set(grid, x, y, rng:pick(Tiles.DustVariants))
+                local roll = rng:int(1, 10)
+                local tile = Tiles.DUST
+                if roll == 1 then
+                    tile = Tiles.DUST_B
+                elseif roll == 2 then
+                    tile = Tiles.DUST_C
+                end
+                Grid.set(grid, x, y, tile)
             end
         end
     end
@@ -146,8 +154,7 @@ local function stampTown(grid, cx, cy, poiTile, cfg)
     local r = cfg.plazaRadius
     for y = cy - r, cy + r + 1 do
         for x = cx - r - 1, cx + r + 1 do
-            local ring = (x == cx - r - 1 or x == cx + r + 1 or y == cy - r or y == cy + r + 1)
-            Grid.set(grid, x, y, ring and Tiles.WALKWAY or Tiles.COLONY)
+            Grid.set(grid, x, y, Tiles.COLONY)
         end
     end
 
@@ -161,7 +168,7 @@ local function stampTown(grid, cx, cy, poiTile, cfg)
     end
     Grid.set(grid, cx, cy, poiTile)
 
-    -- landing pad marker in the plaza's south-east corner
+    -- supply crates parked in the plaza's south-east corner
     Grid.set(grid, cx + r, cy + r, Tiles.DOME)
 end
 
@@ -251,7 +258,7 @@ end
 
 local function isTownTile(tile)
     local info = Tiles.Info[tile]
-    return tile == Tiles.COLONY or tile == Tiles.WALKWAY or tile == Tiles.DOME
+    return tile == Tiles.COLONY or tile == Tiles.DOME
         or tile == Tiles.BUILDING or (info and info.poi)
 end
 
@@ -371,7 +378,7 @@ local function stampDisk(grid, cx, cy, radius, tile, onlyIf)
 end
 
 local function placeAccents(grid, rng, cfg)
-    local accents = { Tiles.CANYON, Tiles.CRATER, Tiles.LAVA }
+    local accents = { Tiles.CANYON, Tiles.CRATER }
     for _ = 1, cfg.accentBlobCount do
         local x = rng:int(4, grid.width - 3)
         local y = rng:int(4, grid.height - 3)
