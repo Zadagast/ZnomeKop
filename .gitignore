@@ -24,3 +24,6 @@ venv/
 # Local tooling
 *.log
 .cache/
+
+# scratch downloads
+support/downloads/
