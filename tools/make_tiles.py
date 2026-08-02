@@ -9,7 +9,8 @@ Style rules (enforced, not vibes):
   5. Buildings are 96x64 (3x2 tiles) with dithered roof, white walls, black door
 
 All output is deterministic. This is the single source of game art.
-Creature sprites come from tools/psg.py (pixel-sprite-generator port, MIT).
+Player frames are hand-authored pixel maps in tools/sprites.py.
+Creature sprites are curated 1-bit PNGs in assets/creatures/.
 """
 
 from __future__ import annotations
@@ -18,11 +19,12 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw
 
-import psg
+import sprites
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "source" / "images"
 SYS = ROOT / "source" / "SystemAssets"
+CREATURE_DIR = ROOT / "assets" / "creatures"
 
 T = 32  # tile size
 
@@ -301,82 +303,25 @@ def building_ruin() -> Image.Image:
 
 # ------------------------------------------------------------------ player --
 
-def _player_base(d: ImageDraw.ImageDraw) -> None:
-    """Shared suit body for all facings (arms + torso)."""
-    # torso
-    d.rectangle((10, 16, 21, 25), fill=WHITE)
-    d.rectangle((10, 16, 21, 25), outline=BLACK, width=2)
-    # arms
-    d.rectangle((6, 17, 9, 23), outline=BLACK)
-    d.rectangle((22, 17, 25, 23), outline=BLACK)
-
-
-def _legs(d: ImageDraw.ImageDraw, step: int) -> None:
-    if step == 0:
-        d.rectangle((11, 26, 14, 31), fill=BLACK)
-        d.rectangle((17, 26, 20, 31), fill=BLACK)
-    else:
-        d.rectangle((10, 25, 13, 30), fill=BLACK)
-        d.rectangle((18, 27, 21, 31), fill=BLACK)
-
-
-def player_frame(facing: str, step: int) -> Image.Image:
-    img = new()
-    d = ImageDraw.Draw(img)
-
-    # helmet: big GB-proportion dome
-    d.ellipse((8, 1, 23, 16), fill=WHITE)
-    d.ellipse((8, 1, 23, 16), outline=BLACK, width=2)
-
-    if facing == "down":
-        d.rectangle((11, 7, 20, 12), outline=BLACK)
-        d.rectangle((13, 9, 14, 10), fill=BLACK)
-        d.rectangle((17, 9, 18, 10), fill=BLACK)
-    elif facing == "up":
-        # backpack visible from behind
-        d.rectangle((11, 6, 20, 13), fill=BLACK)
-        d.line((13, 7, 13, 12), fill=WHITE)
-        d.line((18, 7, 18, 12), fill=WHITE)
-    elif facing == "left":
-        d.rectangle((9, 7, 16, 12), outline=BLACK)
-        d.rectangle((11, 9, 12, 10), fill=BLACK)
-
-    _player_base(d)
-
-    if facing == "left":
-        # backpack hump on the right side
-        d.rectangle((21, 17, 24, 24), fill=BLACK)
-
-    _legs(d, step)
-    return img
-
-
 def player_frames() -> list[Image.Image]:
-    down0 = player_frame("down", 0)
-    down1 = player_frame("down", 1)
-    up0 = player_frame("up", 0)
-    up1 = player_frame("up", 1)
-    left0 = player_frame("left", 0)
-    left1 = player_frame("left", 1)
-    right0 = left0.transpose(Image.FLIP_LEFT_RIGHT)
-    right1 = left1.transpose(Image.FLIP_LEFT_RIGHT)
-    return [down0, down1, up0, up1, left0, left1, right0, right1]
+    """Hand-authored pixel maps, see tools/sprites.py."""
+    return sprites.player_frames()
 
 
 # ---------------------------------------------------------------- creatures --
 
-CREATURES = [
-    ("gritmite", "blob"),
-    ("basaltusk", "quadruped"),
-    ("cindrel", "flyer"),
-    ("frostil", "blob"),
-    ("voxbat", "flyer"),
-    ("rustling", "quadruped"),
-]
+# Order must match Creatures.list in source/data/creatures.lua
+CREATURES = ["gritmite", "basaltusk", "cindrel", "frostil", "voxbat", "rustling"]
 
 
 def creature_frames() -> list[Image.Image]:
-    return [psg.creature_sprite(f"znome:{cid}", mask) for cid, mask in CREATURES]
+    frames = []
+    for cid in CREATURES:
+        path = CREATURE_DIR / f"{cid}.png"
+        if not path.is_file():
+            raise SystemExit(f"Missing creature sprite: {path}")
+        frames.append(Image.open(path).convert("1"))
+    return frames
 
 
 # ------------------------------------------------------------------- tables --
@@ -464,9 +409,8 @@ def diorama(width: int, height: int) -> Image.Image:
     outpost = building_outpost()
     img.paste(outpost, (width - 120, height - 76))
     # player + a znome
-    img.paste(player_frame("down", 0), (width // 2 - 32, height - 60))
-    znome = psg.creature_sprite("znome:gritmite", "blob")
-    img.paste(znome, (width // 2 + 8, height - 60))
+    img.paste(player_frames()[0], (width // 2 - 40, height - 60))
+    img.paste(creature_frames()[0], (width // 2 + 8, height - 60))
     return img
 
 
