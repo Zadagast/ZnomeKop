@@ -19,6 +19,10 @@ Tiles = {
     WALKWAY = 15,
     CRATER = 16,
     SPIRE = 17,     -- silica spire blocker (tree stand-in)
+    POOL_TL = 18,   -- 2x2 brine pool corners (solid)
+    POOL_TR = 19,
+    POOL_BL = 20,
+    POOL_BR = 21,
 }
 
 Tiles.Info = {
@@ -39,6 +43,10 @@ Tiles.Info = {
     [Tiles.WALKWAY] = { name = "Walkway", solid = false, encounter = 0.0, poi = false },
     [Tiles.CRATER] = { name = "Crater Rim", solid = false, encounter = 0.05, poi = false },
     [Tiles.SPIRE] = { name = "Silica Spire", solid = true, encounter = 0, poi = false },
+    [Tiles.POOL_TL] = { name = "Brine Pool", solid = true, encounter = 0, poi = false },
+    [Tiles.POOL_TR] = { name = "Brine Pool", solid = true, encounter = 0, poi = false },
+    [Tiles.POOL_BL] = { name = "Brine Pool", solid = true, encounter = 0, poi = false },
+    [Tiles.POOL_BR] = { name = "Brine Pool", solid = true, encounter = 0, poi = false },
 }
 
 Tiles.Ground = {

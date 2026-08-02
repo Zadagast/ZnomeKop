@@ -1,6 +1,11 @@
--- Outdoor Mars sector generator (classic route + town feel).
--- Hybrid method: towns -> roads -> grass patches -> blockers -> connectivity.
--- Lightweight constrained adjacency, Playdate-friendly.
+-- Mars sector generator: ordered, clustered passes for readable maps.
+--   1. cellular-automata cliff ridges
+--   2. town plazas (5x5) with POI buildings
+--   3. A* routes between towns (playdate.pathfinder, terrain-cost weighted)
+--   4. solid dustreed fields beside routes
+--   5. accent blobs, brine pools, spire groves
+--   6. flood-fill connectivity repair
+-- Route carving borrows the SDK Pathfinder example pattern (0BSD).
 
 import "CoreLibs/object"
 
@@ -13,10 +18,9 @@ local DIRS = {
     { -1, 0 },
 }
 
-local function fill(grid, tile)
-    for i = 1, grid.width * grid.height do
-        grid.data[i] = tile
-    end
+local function isGround(tile)
+    return tile == Tiles.DUST or tile == Tiles.CANYON
+        or tile == Tiles.CRATER or tile == Tiles.LAVA
 end
 
 local function setBorder(grid, tile)
@@ -30,41 +34,76 @@ local function setBorder(grid, tile)
     end
 end
 
-local function stampDisk(grid, cx, cy, radius, tile, onlyIf)
-    for y = cy - radius, cy + radius do
-        for x = cx - radius, cx + radius do
-            if Grid.inBounds(grid, x, y) then
-                local dx, dy = x - cx, y - cy
-                if dx * dx + dy * dy <= radius * radius then
-                    local cur = Grid.get(grid, x, y)
-                    if onlyIf == nil or onlyIf(cur) then
-                        Grid.set(grid, x, y, tile)
+-- Pass 1: cliff ridges ------------------------------------------------------
+
+local function generateCliffs(grid, rng, cfg)
+    local w, h = grid.width, grid.height
+    local cells = Grid.new(w, h, false)
+    for y = 2, h - 1 do
+        for x = 2, w - 1 do
+            if rng:chance(cfg.cliffSeedChance) then
+                Grid.set(cells, x, y, true)
+            end
+        end
+    end
+
+    for _ = 1, cfg.caSteps do
+        local nxt = Grid.new(w, h, false)
+        for y = 2, h - 1 do
+            for x = 2, w - 1 do
+                local n = 0
+                for oy = -1, 1 do
+                    for ox = -1, 1 do
+                        if not (ox == 0 and oy == 0) then
+                            local v = Grid.get(cells, x + ox, y + oy)
+                            -- Out-of-bounds counts as cliff so ridges hug the border
+                            if v == nil or v == true then
+                                n += 1
+                            end
+                        end
                     end
+                end
+                if Grid.get(cells, x, y) then
+                    Grid.set(nxt, x, y, n >= cfg.caSurvive)
+                else
+                    Grid.set(nxt, x, y, n >= cfg.caBirth)
+                end
+            end
+        end
+        cells = nxt
+    end
+
+    -- Write ridges; drop isolated single-tile cliffs (noise)
+    for y = 2, h - 1 do
+        for x = 2, w - 1 do
+            if Grid.get(cells, x, y) then
+                local n = 0
+                for i = 1, 4 do
+                    if Grid.get(cells, x + DIRS[i][1], y + DIRS[i][2]) then
+                        n += 1
+                    end
+                end
+                if n >= 1 then
+                    Grid.set(grid, x, y, Tiles.WALL)
                 end
             end
         end
     end
 end
 
-local function carveRoad(grid, x0, y0, x1, y1, tile)
-    local x, y = x0, y0
-    while true do
-        local cur = Grid.get(grid, x, y)
-        if cur == Tiles.WALL or cur == Tiles.SPIRE or cur == Tiles.FROST or cur == Tiles.DUST
-            or cur == Tiles.CANYON or cur == Tiles.LAVA or cur == Tiles.CRATER or cur == Tiles.ENCOUNTER then
-            Grid.set(grid, x, y, tile)
-        elseif cur == Tiles.ROCK then
-            Grid.set(grid, x, y, tile)
-        end
-        if x == x1 and y == y1 then
-            break
-        end
-        if x ~= x1 and (y == y1 or math.abs(x - x1) >= math.abs(y - y1)) then
-            if x < x1 then x += 1 else x -= 1 end
-        else
-            if y < y1 then y += 1 else y -= 1 end
+-- Pass 2: towns --------------------------------------------------------------
+
+local function stampTown(grid, cx, cy, poiTile, cfg)
+    local r = cfg.plazaRadius
+    for y = cy - r, cy + r do
+        for x = cx - r, cx + r do
+            local ring = (x == cx - r or x == cx + r or y == cy - r or y == cy + r)
+            Grid.set(grid, x, y, ring and Tiles.WALKWAY or Tiles.COLONY)
         end
     end
+    Grid.set(grid, cx, cy, poiTile)
+    -- landing pad marker in a plaza corner
+    Grid.set(grid, cx + 1, cy + 1, Tiles.DOME)
 end
 
 local function farEnough(pois, x, y, minDist)
@@ -84,166 +123,252 @@ local function placeTowns(grid, rng, cfg)
     for _ = 1, cfg.ruinsCount do plan[#plan + 1] = Tiles.RUINS end
     rng:shuffle(plan)
 
+    local margin = cfg.plazaRadius + 2
     local pois = {}
     for i = 1, #plan do
-        local x, y
-        for _try = 1, 80 do
-            local tx = rng:int(4, grid.width - 3)
-            local ty = rng:int(4, grid.height - 3)
-            if farEnough(pois, tx, ty, cfg.poiMinDistance) then
-                x, y = tx, ty
+        for _try = 1, 120 do
+            local x = rng:int(margin, grid.width - margin + 1)
+            local y = rng:int(margin, grid.height - margin + 1)
+            if farEnough(pois, x, y, cfg.poiMinDistance) then
+                stampTown(grid, x, y, plan[i], cfg)
+                pois[#pois + 1] = {
+                    x = x,
+                    y = y,
+                    tile = plan[i],
+                    kind = Tiles.Info[plan[i]].poiType,
+                }
                 break
             end
-        end
-        if x then
-            -- Town apron: plaza + walkways (Pokemon-town readability)
-            stampDisk(grid, x, y, cfg.townRadius, Tiles.COLONY, function(t)
-                return t ~= Tiles.WALL
-            end)
-            for _, n in ipairs(Grid.neighbors4(x, y)) do
-                if Grid.inBounds(grid, n.x, n.y) then
-                    Grid.set(grid, n.x, n.y, Tiles.WALKWAY)
-                end
-            end
-            -- Decorative dome tile nearby for outposts
-            if plan[i] == Tiles.OUTPOST or plan[i] == Tiles.LAB then
-                local dx = rng:pick({ -1, 1 })
-                local dy = rng:pick({ -1, 1 })
-                local dx2, dy2 = x + dx, y + dy
-                if Grid.inBounds(grid, dx2, dy2) then
-                    Grid.set(grid, dx2, dy2, Tiles.DOME)
-                end
-            end
-            Grid.set(grid, x, y, plan[i])
-            pois[#pois + 1] = {
-                x = x,
-                y = y,
-                tile = plan[i],
-                kind = Tiles.Info[plan[i]].poiType,
-            }
         end
     end
     return pois
 end
 
-local function connectTowns(grid, pois)
-    if #pois == 0 then
-        return
+-- Pass 3: routes (A* with terrain costs) -------------------------------------
+
+local function tileCost(tile, cfg)
+    if tile == Tiles.WALL or tile == Tiles.SPIRE then
+        return cfg.routeCostCliff
+    elseif tile == Tiles.ENCOUNTER then
+        return cfg.routeCostGrass
     end
-    for i = 2, #pois do
-        carveRoad(grid, pois[i - 1].x, pois[i - 1].y, pois[i].x, pois[i].y, Tiles.ROCK)
-    end
-    -- loop a bit for nicer routes
-    if #pois >= 3 then
-        carveRoad(grid, pois[1].x, pois[1].y, pois[#pois].x, pois[#pois].y, Tiles.ROCK)
-    end
-    -- restore building tiles overwritten by roads
-    for i = 1, #pois do
-        Grid.set(grid, pois[i].x, pois[i].y, pois[i].tile)
-    end
+    return cfg.routeCostGround
 end
 
-local function paintBaseTerrain(grid, rng)
-    for y = 2, grid.height - 1 do
-        for x = 2, grid.width - 1 do
-            local t = Grid.get(grid, x, y)
-            if t == Tiles.ROCK then
-                -- leave roads; convert some leftover plains to dust
-                -- roads are painted after; initial fill is dust
-            end
+local function buildRouteGraph(grid, cfg)
+    local w, h = grid.width, grid.height
+    local graph = playdate.pathfinder.graph.new()
+    local nodes = graph:addNewNodes(w * h)
+
+    local function idx(x, y)
+        return (y - 1) * w + x
+    end
+
+    for y = 1, h do
+        for x = 1, w do
+            nodes[idx(x, y)]:setXY(x, y)
         end
     end
-    -- soft biome speckles on open dust
-    for y = 2, grid.height - 1 do
-        for x = 2, grid.width - 1 do
-            if Grid.get(grid, x, y) == Tiles.DUST then
-                local r = rng:float()
-                if r < 0.08 then
-                    Grid.set(grid, x, y, Tiles.CANYON)
-                elseif r < 0.12 then
-                    Grid.set(grid, x, y, Tiles.CRATER)
+
+    -- Edge weight = cost of entering the target cell. Border excluded.
+    for y = 2, h - 1 do
+        for x = 2, w - 1 do
+            local node = nodes[idx(x, y)]
+            for i = 1, 4 do
+                local nx = x + DIRS[i][1]
+                local ny = y + DIRS[i][2]
+                if nx >= 2 and ny >= 2 and nx <= w - 1 and ny <= h - 1 then
+                    local cost = tileCost(Grid.get(grid, nx, ny), cfg)
+                    node:addConnectionToNodeWithXY(nx, ny, cost, false)
                 end
             end
         end
     end
+
+    return graph
 end
 
-local function placeGrassPatches(grid, pois, rng, cfg)
-    -- Prefer patches near roads but not inside towns.
-    local candidates = {}
-    for y = 3, grid.height - 2 do
-        for x = 3, grid.width - 2 do
-            if Grid.get(grid, x, y) == Tiles.ROCK then
-                candidates[#candidates + 1] = { x = x, y = y }
-            end
-        end
+local function isTownTile(tile)
+    local info = Tiles.Info[tile]
+    return tile == Tiles.COLONY or tile == Tiles.WALKWAY or tile == Tiles.DOME
+        or (info and info.poi)
+end
+
+local function stampRouteCell(grid, x, y)
+    local tile = Grid.get(grid, x, y)
+    if tile ~= nil and not isTownTile(tile) then
+        Grid.set(grid, x, y, Tiles.ROCK)
     end
-    if #candidates == 0 then
+end
+
+local function carveRoutes(grid, pois, cfg)
+    if #pois < 2 then
         return
     end
-    rng:shuffle(candidates)
+    local graph = buildRouteGraph(grid, cfg)
 
-    local placed = 0
-    local i = 1
-    while placed < cfg.grassPatchCount and i <= #candidates do
-        local c = candidates[i]
-        i += 1
-        local nearTown = false
-        for p = 1, #pois do
-            if Grid.chebyshev(c.x, c.y, pois[p].x, pois[p].y) <= cfg.townRadius + 1 then
-                nearTown = true
-                break
+    local links = {}
+    for i = 2, #pois do
+        links[#links + 1] = { pois[i - 1], pois[i] }
+    end
+    -- close the loop for route variety
+    if #pois >= 3 then
+        links[#links + 1] = { pois[#pois], pois[1] }
+    end
+
+    for i = 1, #links do
+        local a, b = links[i][1], links[i][2]
+        local startNode = graph:nodeWithXY(a.x, a.y)
+        local endNode = graph:nodeWithXY(b.x, b.y)
+        local path = graph:findPath(startNode, endNode)
+        if path then
+            for p = 1, #path do
+                local n = path[p]
+                stampRouteCell(grid, n.x, n.y)
+                -- widen to 2 tiles (right neighbor)
+                stampRouteCell(grid, n.x + 1, n.y)
             end
         end
-        if not nearTown then
-            -- Offset patch beside the road
-            local ox = c.x + rng:pick({ -2, -1, 1, 2, 0 })
-            local oy = c.y + rng:pick({ -2, -1, 1, 2, 0 })
-            stampDisk(grid, ox, oy, cfg.grassPatchRadius, Tiles.ENCOUNTER, function(t)
-                return (t == Tiles.DUST or t == Tiles.CANYON or t == Tiles.CRATER)
-                    and rng:chance(cfg.grassDensity)
-            end)
-            -- Also convert some dust around road to grass
-            stampDisk(grid, ox, oy, cfg.grassPatchRadius, Tiles.ENCOUNTER, function(t)
-                return t == Tiles.DUST and rng:chance(cfg.grassDensity)
-            end)
+    end
+end
+
+-- Pass 4: dustreed fields ------------------------------------------------------
+
+local function placeGrassFields(grid, pois, rng, cfg)
+    -- gather route cells as anchors
+    local anchors = {}
+    for y = 2, grid.height - 1 do
+        for x = 2, grid.width - 1 do
+            if Grid.get(grid, x, y) == Tiles.ROCK then
+                anchors[#anchors + 1] = { x = x, y = y }
+            end
+        end
+    end
+    if #anchors == 0 then
+        return
+    end
+    rng:shuffle(anchors)
+
+    local placed = 0
+    local ai = 1
+    while placed < cfg.grassFieldCount and ai <= #anchors do
+        local a = anchors[ai]
+        ai += 1
+        local fw = rng:int(cfg.grassFieldMinW, cfg.grassFieldMaxW)
+        local fh = rng:int(cfg.grassFieldMinH, cfg.grassFieldMaxH)
+        local ox = a.x + rng:pick({ -fw - 1, 2 })
+        local oy = a.y + rng:pick({ -fh - 1, 2 })
+
+        -- field must sit on open ground, not too close to towns
+        local ok = true
+        for y = oy, oy + fh - 1 do
+            for x = ox, ox + fw - 1 do
+                local t = Grid.get(grid, x, y)
+                if t == nil or not isGround(t) then
+                    ok = false
+                    break
+                end
+            end
+            if not ok then break end
+        end
+        if ok then
+            for p = 1, #pois do
+                if Grid.chebyshev(a.x, a.y, pois[p].x, pois[p].y) <= cfg.plazaRadius + 2 then
+                    ok = false
+                    break
+                end
+            end
+        end
+
+        if ok then
+            for y = oy, oy + fh - 1 do
+                for x = ox, ox + fw - 1 do
+                    Grid.set(grid, x, y, Tiles.ENCOUNTER)
+                end
+            end
             placed += 1
         end
     end
 end
 
-local function placeBlockers(grid, rng, cfg)
-    for y = 2, grid.height - 1 do
-        for x = 2, grid.width - 1 do
-            local t = Grid.get(grid, x, y)
-            if t == Tiles.DUST or t == Tiles.CANYON or t == Tiles.CRATER then
-                if rng:chance(cfg.cliffChance) then
-                    Grid.set(grid, x, y, Tiles.WALL)
-                elseif rng:chance(cfg.spireChance) then
-                    Grid.set(grid, x, y, Tiles.SPIRE)
+-- Pass 5: accents, pools, groves ----------------------------------------------
+
+local function stampDisk(grid, cx, cy, radius, tile, onlyIf)
+    for y = cy - radius, cy + radius do
+        for x = cx - radius, cx + radius do
+            if Grid.inBounds(grid, x, y) then
+                local dx, dy = x - cx, y - cy
+                if dx * dx + dy * dy <= radius * radius then
+                    local cur = Grid.get(grid, x, y)
+                    if onlyIf == nil or onlyIf(cur) then
+                        Grid.set(grid, x, y, tile)
+                    end
                 end
             end
         end
     end
+end
 
-    -- Small brine pools (water-like obstacles)
-    for _ = 1, cfg.frostPoolCount do
-        local x = rng:int(3, grid.width - 2)
-        local y = rng:int(3, grid.height - 2)
-        stampDisk(grid, x, y, rng:int(1, 2), Tiles.FROST, function(t)
-            return t == Tiles.DUST or t == Tiles.CANYON or t == Tiles.CRATER
-        end)
-    end
-
-    -- Vent rock patches
-    for _ = 1, cfg.ventPatchCount do
-        local x = rng:int(3, grid.width - 2)
-        local y = rng:int(3, grid.height - 2)
-        stampDisk(grid, x, y, 2, Tiles.LAVA, function(t)
-            return t == Tiles.DUST or t == Tiles.CRATER
+local function placeAccents(grid, rng, cfg)
+    local accents = { Tiles.CANYON, Tiles.CRATER, Tiles.LAVA }
+    for _ = 1, cfg.accentBlobCount do
+        local x = rng:int(4, grid.width - 3)
+        local y = rng:int(4, grid.height - 3)
+        local tile = rng:pick(accents)
+        stampDisk(grid, x, y, cfg.accentBlobRadius, tile, function(t)
+            return t == Tiles.DUST
         end)
     end
 end
+
+local function placePools(grid, rng, cfg)
+    local placed = 0
+    for _try = 1, 80 do
+        if placed >= cfg.poolCount then
+            break
+        end
+        local x = rng:int(3, grid.width - 3)
+        local y = rng:int(3, grid.height - 3)
+        local clear = true
+        for oy = 0, 1 do
+            for ox = 0, 1 do
+                local t = Grid.get(grid, x + ox, y + oy)
+                if t == nil or not isGround(t) then
+                    clear = false
+                    break
+                end
+            end
+            if not clear then break end
+        end
+        if clear then
+            Grid.set(grid, x, y, Tiles.POOL_TL)
+            Grid.set(grid, x + 1, y, Tiles.POOL_TR)
+            Grid.set(grid, x, y + 1, Tiles.POOL_BL)
+            Grid.set(grid, x + 1, y + 1, Tiles.POOL_BR)
+            placed += 1
+        end
+    end
+end
+
+local function placeSpireGroves(grid, rng, cfg)
+    for _ = 1, cfg.spireGroveCount do
+        local x = rng:int(3, grid.width - 2)
+        local y = rng:int(3, grid.height - 2)
+        local count = rng:int(cfg.spireGroveMin, cfg.spireGroveMax)
+        for _s = 1, count do
+            local t = Grid.get(grid, x, y)
+            if t ~= nil and isGround(t) then
+                Grid.set(grid, x, y, Tiles.SPIRE)
+            end
+            x = x + rng:int(-1, 1)
+            y = y + rng:int(-1, 1)
+            if x < 3 then x = 3 elseif x > grid.width - 2 then x = grid.width - 2 end
+            if y < 3 then y = 3 elseif y > grid.height - 2 then y = grid.height - 2 end
+        end
+    end
+end
+
+-- Pass 6: connectivity ---------------------------------------------------------
 
 local function floodWalkable(grid, sx, sy)
     local visited = Grid.new(grid.width, grid.height, false)
@@ -270,13 +395,31 @@ local function floodWalkable(grid, sx, sy)
     return visited, count
 end
 
+local function carveLine(grid, x0, y0, x1, y1)
+    local x, y = x0, y0
+    while true do
+        local tile = Grid.get(grid, x, y)
+        if tile ~= nil and not Tiles.isWalkable(tile) and not isTownTile(tile) then
+            Grid.set(grid, x, y, Tiles.ROCK)
+        end
+        if x == x1 and y == y1 then
+            break
+        end
+        if x ~= x1 and (y == y1 or math.abs(x - x1) >= math.abs(y - y1)) then
+            if x < x1 then x += 1 else x -= 1 end
+        else
+            if y < y1 then y += 1 else y -= 1 end
+        end
+    end
+end
+
 local function ensureConnectivity(grid, startX, startY, cfg)
     local visited = floodWalkable(grid, startX, startY)
     local repairs = 0
     for y = 2, grid.height - 1 do
         for x = 2, grid.width - 1 do
             if Tiles.isWalkable(Grid.get(grid, x, y)) and not Grid.get(visited, x, y) then
-                carveRoad(grid, x, y, startX, startY, Tiles.ROCK)
+                carveLine(grid, x, y, startX, startY)
                 repairs += 1
                 visited = floodWalkable(grid, startX, startY)
                 if repairs >= cfg.maxConnectivityRepairs then
@@ -295,14 +438,16 @@ local function ensureConnectivity(grid, startX, startY, cfg)
     return repairs
 end
 
+-- ------------------------------------------------------------------------------
+
 local function pickSpawn(pois)
     for i = 1, #pois do
         if pois[i].tile == Tiles.OUTPOST then
-            return pois[i].x, pois[i].y
+            return pois[i].x, pois[i].y + 1 -- doorstep, not inside the building
         end
     end
     if #pois > 0 then
-        return pois[1].x, pois[1].y
+        return pois[1].x, pois[1].y + 1
     end
     return 5, 5
 end
@@ -323,35 +468,24 @@ function Mapgen.generate(seed, overrides)
     local t0 = playdate.getCurrentTimeMilliseconds()
 
     setBorder(grid, Tiles.WALL)
-    paintBaseTerrain(grid, rng)
+    generateCliffs(grid, rng, cfg)
     local pois = placeTowns(grid, rng, cfg)
-    connectTowns(grid, pois)
-    placeGrassPatches(grid, pois, rng, cfg)
-    placeBlockers(grid, rng, cfg)
-
-    -- Keep roads clear of blockers/grass
-    -- Re-carve roads once more for clarity, then restore POIs.
-    connectTowns(grid, pois)
+    carveRoutes(grid, pois, cfg)
+    placeGrassFields(grid, pois, rng, cfg)
+    placeAccents(grid, rng, cfg)
+    placePools(grid, rng, cfg)
+    placeSpireGroves(grid, rng, cfg)
 
     local spawnX, spawnY = pickSpawn(pois)
     if not Tiles.isWalkable(Grid.get(grid, spawnX, spawnY)) then
-        Grid.set(grid, spawnX, spawnY, Tiles.OUTPOST)
+        Grid.set(grid, spawnX, spawnY, Tiles.COLONY)
     end
 
     local repairs = ensureConnectivity(grid, spawnX, spawnY, cfg)
 
-    -- Final POI assert + clear immediate neighbors for doorstep
+    -- Final assert: towns intact after all carving
     for i = 1, #pois do
-        local p = pois[i]
-        Grid.set(grid, p.x, p.y, p.tile)
-        for _, n in ipairs(Grid.neighbors4(p.x, p.y)) do
-            if Grid.inBounds(grid, n.x, n.y) then
-                local t = Grid.get(grid, n.x, n.y)
-                if t == Tiles.WALL or t == Tiles.SPIRE or t == Tiles.FROST or t == Tiles.ENCOUNTER then
-                    Grid.set(grid, n.x, n.y, Tiles.WALKWAY)
-                end
-            end
-        end
+        Grid.set(grid, pois[i].x, pois[i].y, pois[i].tile)
     end
 
     local ms = playdate.getCurrentTimeMilliseconds() - t0

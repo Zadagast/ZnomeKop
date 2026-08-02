@@ -1,36 +1,45 @@
 -- Tunable parameters for Mars sector generation.
--- Tuned for classic outdoor "route + town" readability.
+-- Ordered passes: cliffs -> towns -> routes -> grass -> features -> repair.
 
 Generation = {
-    -- Fewer tiles than the 16px prototype: 32px tiles are larger on-screen.
     width = 32,
     height = 24,
 
-    -- Settlements / landmarks
+    -- Settlements (each gets a 5x5 plaza)
     outpostCount = 2,
     labCount = 1,
     tubeCount = 1,
     ruinsCount = 1,
+    poiMinDistance = 9,
+    plazaRadius = 2,
 
-    -- Town plaza radius around buildings
-    townRadius = 2,
+    -- Cliff ridges (cellular automata, 8-neighborhood)
+    cliffSeedChance = 0.38,
+    caSteps = 3,
+    caBirth = 5,    -- empty cell becomes cliff at >= this many cliff neighbors
+    caSurvive = 4,  -- cliff cell survives at >= this many cliff neighbors
 
-    -- Road / route carving
-    roadWidth = 1,
+    -- Route carving (A* edge costs; routes prefer open ground)
+    routeCostGround = 10,
+    routeCostGrass = 14,
+    routeCostCliff = 60,
 
-    -- Dustreed (encounter grass) patches near routes
-    grassPatchCount = 10,
-    grassPatchRadius = 2,
-    grassDensity = 0.72,
+    -- Dustreed fields (solid rectangles beside routes)
+    grassFieldCount = 4,
+    grassFieldMinW = 3,
+    grassFieldMaxW = 6,
+    grassFieldMinH = 2,
+    grassFieldMaxH = 4,
 
-    -- Outdoor blockers
-    cliffChance = 0.10,
-    spireChance = 0.045,
-    frostPoolCount = 3,
-    ventPatchCount = 2,
+    -- Terrain accent blobs (canyon / crater / vent patches)
+    accentBlobCount = 3,
+    accentBlobRadius = 2,
 
-    -- Spacing
-    poiMinDistance = 8,
+    -- Features
+    poolCount = 2,          -- 2x2 brine pools
+    spireGroveCount = 3,    -- clusters of silica spires
+    spireGroveMin = 3,
+    spireGroveMax = 5,
 
-    maxConnectivityRepairs = 60,
+    maxConnectivityRepairs = 40,
 }

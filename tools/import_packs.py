@@ -73,6 +73,12 @@ def stealth(tiles: list[Image.Image], x: int, y: int) -> Image.Image:
     return tiles[y * 10 + x]
 
 
+def stealth_px(px_x: int, px_y: int) -> Image.Image:
+    """Crop a 32x32 window at an arbitrary pixel offset (for seamless fills)."""
+    im = flatten(Image.open(STEALTH))
+    return im.crop((px_x, px_y, px_x + 32, px_y + 32))
+
+
 def stack_v(top: Image.Image, bottom: Image.Image) -> Image.Image:
     out = Image.new("RGB", (32, 64), (255, 255, 255))
     out.paste(top, (0, 0))
@@ -93,28 +99,51 @@ def make_table(frames: list[Image.Image], path: Path) -> None:
     print(f"wrote {path} ({sheet.size[0]}x{sheet.size[1]}, {len(frames)} frames)")
 
 
+def make_table_alpha(frames: list[Image.Image], path: Path) -> None:
+    """Imagetable with white treated as transparent (sprite floats over terrain)."""
+    w, h = frames[0].size
+    sheet = Image.new("RGBA", (w * len(frames), h), (0, 0, 0, 0))
+    for i, fr in enumerate(frames):
+        bit = fr if fr.mode == "1" else to_playdate_1bit(fr)
+        rgba = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+        px = bit.load()
+        out = rgba.load()
+        for y in range(h):
+            for x in range(w):
+                if px[x, y] == 0:
+                    out[x, y] = (0, 0, 0, 255)
+        sheet.paste(rgba, (i * w, 0))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    sheet.save(path)
+    print(f"wrote {path} (alpha, {sheet.size[0]}x{sheet.size[1]}, {len(frames)} frames)")
+
+
 def build_tiles(st: list[Image.Image]) -> list[Image.Image]:
     # Fixed mapping — game look is defined here.
     # Indices must stay aligned with source/data/tiles.lua
     empty = Image.new("RGB", (32, 32), (255, 255, 255))
     return [
         empty,                           # 1 EMPTY
-        stealth(st, 0, 3),               # 2 ROCK path / cobble
-        stealth(st, 2, 2),               # 3 DUST dither plain
-        stealth(st, 2, 0),               # 4 CANYON striated
-        stealth(st, 7, 1),               # 5 LAVA / rocky
-        stealth(st, 4, 9),               # 6 FROST sparse brine / ice flecks
-        stealth(st, 0, 4),               # 7 COLONY diamond plaza
-        stealth(st, 0, 1),               # 8 WALL stone
-        stealth(st, 4, 0),               # 9 OUTPOST pad (cabinet/module)
-        stealth(st, 5, 0),               # 10 LAB pad
-        stealth(st, 1, 1),               # 11 TUBE dark mouth
-        stealth(st, 7, 2),               # 12 RUINS marker
-        stealth(st, 8, 0),               # 13 ENCOUNTER tall grass / dustreed
-        stealth(st, 8, 6),               # 14 DOME / plated floor
-        stealth(st, 2, 3),               # 15 WALKWAY stairs/boards
-        stealth(st, 8, 1),               # 16 CRATER boulder
-        stealth(st, 6, 0),               # 17 SPIRE stump/tree base
+        stealth(st, 0, 3),               # 2 ROCK cobble route
+        stealth_px(4 * 32 + 8, 9 * 32),  # 3 DUST seamless speckle plain
+        stealth(st, 2, 1),               # 4 CANYON eroded strata
+        stealth(st, 0, 2),               # 5 LAVA rubble / vent field
+        stealth(st, 2, 2),               # 6 FROST dither shade (reserved)
+        stealth(st, 8, 6),               # 7 COLONY metal panel plaza
+        stealth(st, 0, 1),               # 8 WALL cliff blocks
+        stealth(st, 8, 6),               # 9 OUTPOST pad (prop overlays)
+        stealth(st, 8, 6),               # 10 LAB pad (prop overlays)
+        stealth(st, 1, 6),               # 11 TUBE cave mouth arch
+        stealth(st, 0, 2),               # 12 RUINS rubble pad (prop overlays)
+        stealth(st, 8, 0),               # 13 ENCOUNTER dustreed grass
+        stealth(st, 4, 10),              # 14 DOME landing pad marker
+        stealth(st, 0, 4),               # 15 WALKWAY woven plating
+        stealth(st, 1, 0),               # 16 CRATER rocky clumps
+        stealth(st, 7, 0),               # 17 SPIRE stump base (prop overlays)
+        stealth(st, 8, 8),               # 18 POOL_TL brine pool corner
+        stealth(st, 9, 8),               # 19 POOL_TR
+        stealth(st, 8, 10),              # 20 POOL_BL
+        stealth(st, 9, 10),              # 21 POOL_BR
     ]
 
 
@@ -122,41 +151,50 @@ def build_props(st: list[Image.Image]) -> list[Image.Image]:
     # Tall 32x48 props from Stealthix parts
     pine_top = stealth(st, 6, 0)
     pine_mid = stealth(st, 6, 1)
-    round_top = stealth(st, 8, 3)
-    round_bot = stealth(st, 9, 3)
-    cabinet = stealth(st, 4, 0)
-    dresser = stealth(st, 5, 0)
-    shelf = stealth(st, 5, 1)
-    stump = stealth(st, 7, 0)
-    sign = stealth(st, 6, 2)
-
-    def building(body: Image.Image, roof: Image.Image) -> Image.Image:
-        return stack_v(roof, body)
+    console = stealth(st, 0, 7)      # windowed console face
+    wall_a = stealth(st, 2, 7)       # pillared wall body
+    wall_b = stealth(st, 3, 7)       # pillared wall body variant
+    boulder = stealth(st, 9, 1)
+    rubble = stealth(st, 0, 2)
+    arch = stealth(st, 1, 6)         # dark dome arch
+    frame = stealth(st, 1, 7)        # dark framed module
 
     return [
-        building(cabinet, pine_top),     # outpost
-        building(dresser, shelf),        # lab
-        building(sign, stump),           # ruins
-        building(round_bot, round_top),  # dome
-        stack_v(pine_top, pine_mid),     # spire / silica tree
+        stack_v(console, wall_a),    # outpost: console top, module body
+        stack_v(console, wall_b),    # lab: console top, alt body
+        stack_v(boulder, rubble),    # ruins: collapsed boulder pile
+        stack_v(arch, frame),        # dome: arched module
+        stack_v(pine_top, pine_mid), # spire / silica tree
     ]
 
 
 def build_player() -> list[Image.Image]:
-    # Kenney humanoids (16x16) scaled to 32x32.
-    # Four facings x two step frames (duplicate facing if no alt frame).
-    # Chosen from packed sheet character row.
-    faces = {
-        "down": [(25, 0), (26, 0)],
-        "up": [(27, 0), (28, 0)],
-        "left": [(29, 0), (30, 0)],
-        "right": [(31, 0), (25, 1)],
-    }
-    frames = []
-    for facing in ("down", "up", "left", "right"):
-        for xy in faces[facing]:
-            frames.append(scale2(kenney(*xy)))
-    return frames
+    """One Kenney astronaut, 8 frames: 4 facings x 2 step frames.
+
+    Same character everywhere — left is a mirror, the step frame is a
+    1-tile bob. Inverted to black-ink-on-white to sit on light terrain.
+    """
+    base = scale2(kenney(27, 3))  # helmeted astronaut
+
+    def invert(im: Image.Image) -> Image.Image:
+        from PIL import ImageOps
+
+        return ImageOps.invert(im.convert("L")).convert("RGB")
+
+    def bob(im: Image.Image, px: int = 2) -> Image.Image:
+        out = Image.new("RGB", (32, 32), (255, 255, 255))
+        out.paste(im.crop((0, px, 32, 32)), (0, 0))
+        return out
+
+    down = invert(base)
+    left = invert(base.transpose(Image.FLIP_LEFT_RIGHT))
+
+    return [
+        down, bob(down),   # down
+        down, bob(down),   # up
+        left, bob(left),   # left
+        down, bob(down),   # right
+    ]
 
 
 def build_creatures() -> list[Image.Image]:
@@ -239,7 +277,7 @@ def main() -> None:
 
     make_table([to_playdate_1bit(t) for t in build_tiles(st)], OUT / "tiles-table-32-32.png")
     make_table([to_playdate_1bit(t) for t in build_props(st)], OUT / "props-table-32-48.png")
-    make_table([to_playdate_1bit(t) for t in build_player()], OUT / "player-table-32-32.png")
+    make_table_alpha([to_playdate_1bit(t) for t in build_player()], OUT / "player-table-32-32.png")
     make_table([to_playdate_1bit(t) for t in build_creatures()], OUT / "creatures-table-32-32.png")
     build_system_assets(st)
     print("Pack import complete (deterministic).")
