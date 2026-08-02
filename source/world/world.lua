@@ -12,21 +12,11 @@ World.__index = World
 local TILE = 32
 local SCREEN_W, SCREEN_H = 400, 240
 
--- props-table-32-48.png frame indices
-local PROP_FRAME = {
-    outpost = 1,
-    lab = 2,
-    ruins = 3,
-    dome = 4,
-    spire = 5,
-}
-
-local PROP_FOR_TILE = {
-    [Tiles.OUTPOST] = "outpost",
-    [Tiles.LAB] = "lab",
-    [Tiles.RUINS] = "ruins",
-    [Tiles.DOME] = "dome",
-    [Tiles.SPIRE] = "spire",
+-- buildings-table-96-64.png frame indices (96x64 = 3x2 tiles, door centered)
+local BUILDING_FRAME = {
+    [Tiles.OUTPOST] = 1,
+    [Tiles.LAB] = 2,
+    [Tiles.RUINS] = 3,
 }
 
 function World.new(map, player)
@@ -62,23 +52,25 @@ function World:buildTilemap()
 end
 
 function World:buildProps()
-    self.propImages = gfx.imagetable.new("images/props")
-    assert(self.propImages, "Missing images/props imagetable")
+    self.buildingImages = gfx.imagetable.new("images/buildings")
+    assert(self.buildingImages, "Missing images/buildings imagetable")
 
+    -- Door tile is the POI cell; the building spans 3 tiles wide x 2 tall,
+    -- centered on the door column, extending one row up.
     local tiles = self.map.tiles
     for y = 1, tiles.height do
         for x = 1, tiles.width do
             local tile = Grid.get(tiles, x, y)
-            local kind = PROP_FOR_TILE[tile]
-            if kind then
-                local frame = PROP_FRAME[kind]
-                local img = self.propImages:getImage(frame)
+            local frame = BUILDING_FRAME[tile]
+            if frame then
+                local img = self.buildingImages:getImage(frame)
                 local spr = gfx.sprite.new(img)
-                spr:setCenter(0.5, 1.0)
-                local px = (x - 1) * TILE + TILE / 2
-                local py = (y - 1) * TILE + TILE
+                spr:setCenter(0, 0)
+                local px = (x - 2) * TILE
+                local py = (y - 2) * TILE
                 spr:moveTo(px, py)
-                spr:setZIndex(1000 + py)
+                -- -1 so the player on the doorstep draws in front
+                spr:setZIndex(1000 + y * TILE - 1)
                 spr:add()
                 self.props[#self.props + 1] = spr
             end
@@ -168,6 +160,8 @@ function World:rollEncounter()
             habitat = "canyon"
         elseif tile == Tiles.LAVA then
             habitat = "lava"
+        elseif tile == Tiles.FROST then
+            habitat = "frost"
         elseif tile == Tiles.RUINS then
             habitat = "ruins"
         elseif tile == Tiles.CRATER then

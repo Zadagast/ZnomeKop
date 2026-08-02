@@ -23,15 +23,16 @@ Tiles = {
     POOL_TR = 19,
     POOL_BL = 20,
     POOL_BR = 21,
+    BUILDING = 22,  -- solid footprint under 96x64 building props
 }
 
 Tiles.Info = {
     [Tiles.EMPTY] = { name = "Empty", solid = true, encounter = 0, poi = false },
-    [Tiles.ROCK] = { name = "Regolith Path", solid = false, encounter = 0.0, poi = false },
-    [Tiles.DUST] = { name = "Dust Plain", solid = false, encounter = 0.04, poi = false },
-    [Tiles.CANYON] = { name = "Canyon Shelf", solid = false, encounter = 0.06, poi = false },
-    [Tiles.LAVA] = { name = "Vent Rock", solid = false, encounter = 0.08, poi = false },
-    [Tiles.FROST] = { name = "Brine Pool", solid = true, encounter = 0, poi = false }, -- blocks like water
+    [Tiles.ROCK] = { name = "Route", solid = false, encounter = 0.0, poi = false },
+    [Tiles.DUST] = { name = "Regolith", solid = false, encounter = 0.04, poi = false },
+    [Tiles.CANYON] = { name = "Strata", solid = false, encounter = 0.06, poi = false },
+    [Tiles.LAVA] = { name = "Vent Field", solid = false, encounter = 0.08, poi = false },
+    [Tiles.FROST] = { name = "Frost Patch", solid = false, encounter = 0.05, poi = false },
     [Tiles.COLONY] = { name = "Colony Plaza", solid = false, encounter = 0.0, poi = false },
     [Tiles.WALL] = { name = "Cliff", solid = true, encounter = 0, poi = false },
     [Tiles.OUTPOST] = { name = "Outpost", solid = false, encounter = 0.0, poi = true, poiType = "outpost" },
@@ -47,6 +48,7 @@ Tiles.Info = {
     [Tiles.POOL_TR] = { name = "Brine Pool", solid = true, encounter = 0, poi = false },
     [Tiles.POOL_BL] = { name = "Brine Pool", solid = true, encounter = 0, poi = false },
     [Tiles.POOL_BR] = { name = "Brine Pool", solid = true, encounter = 0, poi = false },
+    [Tiles.BUILDING] = { name = "Structure", solid = true, encounter = 0, poi = false },
 }
 
 Tiles.Ground = {

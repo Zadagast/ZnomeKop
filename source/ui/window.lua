@@ -20,16 +20,18 @@ function UIWindow.drawMessage(text)
 end
 
 function UIWindow.drawMenu(title, options, selected, x, y, w)
-    local h = 28 + #options * 18
+    local hasTitle = title ~= nil and title ~= ""
+    local top = hasTitle and 26 or 10
+    local h = top + 2 + #options * 18
     UIWindow.drawBox(x, y, w, h)
-    gfx.drawText(title, x + 10, y + 6)
+    if hasTitle then
+        gfx.drawText(title, x + 10, y + 6)
+    end
     for i = 1, #options do
-        local rowY = y + 26 + (i - 1) * 18
+        local rowY = y + top + (i - 1) * 18
         if i == selected then
             gfx.fillTriangle(x + 10, rowY + 2, x + 10, rowY + 12, x + 16, rowY + 7)
-            gfx.drawText(options[i], x + 22, rowY)
-        else
-            gfx.drawText(options[i], x + 22, rowY)
         end
+        gfx.drawText(options[i], x + 22, rowY)
     end
 end

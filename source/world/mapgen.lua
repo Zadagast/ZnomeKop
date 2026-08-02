@@ -21,6 +21,7 @@ local DIRS = {
 local function isGround(tile)
     return tile == Tiles.DUST or tile == Tiles.CANYON
         or tile == Tiles.CRATER or tile == Tiles.LAVA
+        or tile == Tiles.FROST
 end
 
 local function setBorder(grid, tile)
@@ -93,17 +94,35 @@ end
 
 -- Pass 2: towns --------------------------------------------------------------
 
+local BUILDING_POIS = {
+    [Tiles.OUTPOST] = true,
+    [Tiles.LAB] = true,
+    [Tiles.RUINS] = true,
+}
+
 local function stampTown(grid, cx, cy, poiTile, cfg)
+    -- Rectangular plaza; building occupies the top rows with the door
+    -- (the POI tile) opening south into the plaza.
     local r = cfg.plazaRadius
-    for y = cy - r, cy + r do
-        for x = cx - r, cx + r do
-            local ring = (x == cx - r or x == cx + r or y == cy - r or y == cy + r)
+    for y = cy - r, cy + r + 1 do
+        for x = cx - r - 1, cx + r + 1 do
+            local ring = (x == cx - r - 1 or x == cx + r + 1 or y == cy - r or y == cy + r + 1)
             Grid.set(grid, x, y, ring and Tiles.WALKWAY or Tiles.COLONY)
         end
     end
+
+    if BUILDING_POIS[poiTile] then
+        -- 3x2 footprint: top row + flanks solid, door center-bottom
+        for x = cx - 1, cx + 1 do
+            Grid.set(grid, x, cy - 1, Tiles.BUILDING)
+        end
+        Grid.set(grid, cx - 1, cy, Tiles.BUILDING)
+        Grid.set(grid, cx + 1, cy, Tiles.BUILDING)
+    end
     Grid.set(grid, cx, cy, poiTile)
-    -- landing pad marker in a plaza corner
-    Grid.set(grid, cx + 1, cy + 1, Tiles.DOME)
+
+    -- landing pad marker in the plaza's south-east corner
+    Grid.set(grid, cx + r, cy + r, Tiles.DOME)
 end
 
 local function farEnough(pois, x, y, minDist)
@@ -123,7 +142,7 @@ local function placeTowns(grid, rng, cfg)
     for _ = 1, cfg.ruinsCount do plan[#plan + 1] = Tiles.RUINS end
     rng:shuffle(plan)
 
-    local margin = cfg.plazaRadius + 2
+    local margin = cfg.plazaRadius + 3
     local pois = {}
     for i = 1, #plan do
         for _try = 1, 120 do
@@ -147,7 +166,9 @@ end
 -- Pass 3: routes (A* with terrain costs) -------------------------------------
 
 local function tileCost(tile, cfg)
-    if tile == Tiles.WALL or tile == Tiles.SPIRE then
+    if tile == Tiles.BUILDING then
+        return 1000 -- never route through buildings
+    elseif tile == Tiles.WALL or tile == Tiles.SPIRE then
         return cfg.routeCostCliff
     elseif tile == Tiles.ENCOUNTER then
         return cfg.routeCostGrass
@@ -191,7 +212,7 @@ end
 local function isTownTile(tile)
     local info = Tiles.Info[tile]
     return tile == Tiles.COLONY or tile == Tiles.WALKWAY or tile == Tiles.DOME
-        or (info and info.poi)
+        or tile == Tiles.BUILDING or (info and info.poi)
 end
 
 local function stampRouteCell(grid, x, y)
@@ -310,7 +331,7 @@ local function stampDisk(grid, cx, cy, radius, tile, onlyIf)
 end
 
 local function placeAccents(grid, rng, cfg)
-    local accents = { Tiles.CANYON, Tiles.CRATER, Tiles.LAVA }
+    local accents = { Tiles.CANYON, Tiles.CRATER, Tiles.LAVA, Tiles.FROST }
     for _ = 1, cfg.accentBlobCount do
         local x = rng:int(4, grid.width - 3)
         local y = rng:int(4, grid.height - 3)
@@ -467,7 +488,8 @@ function Mapgen.generate(seed, overrides)
     local grid = Grid.new(cfg.width, cfg.height, Tiles.DUST)
     local t0 = playdate.getCurrentTimeMilliseconds()
 
-    setBorder(grid, Tiles.WALL)
+    -- Spire tree line around the sector (route tree border), like GB routes
+    setBorder(grid, Tiles.SPIRE)
     generateCliffs(grid, rng, cfg)
     local pois = placeTowns(grid, rng, cfg)
     carveRoutes(grid, pois, cfg)

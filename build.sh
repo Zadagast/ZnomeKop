@@ -12,8 +12,8 @@ fi
 
 export PLAYDATE_SDK_PATH="$SDK_PATH"
 
-# Deterministic pack → imagetable import (fails if packs missing; no fallback art)
-python3 "$ROOT/tools/import_packs.py"
+# Deterministic art generation (single source of game art)
+python3 "$ROOT/tools/make_tiles.py"
 
 OUT="$ROOT/ZnomeKop.pdx"
 rm -rf "$OUT"
