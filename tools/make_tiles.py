@@ -80,8 +80,9 @@ def tile_ground(variant: int = 0) -> Image.Image:
     return sprites.ground_variants()[variant]
 
 
-def tile_route() -> Image.Image:
-    return sprites.route_tile()
+def tile_route(mask: int = 15) -> Image.Image:
+    """mask 15 (fully connected) is the plain surface used mid-generation."""
+    return sprites.route_tile_for_mask(mask)
 
 
 def tile_plaza() -> Image.Image:
@@ -293,6 +294,8 @@ def build_tile_list() -> list[Image.Image]:
         tile_ground(1),         # 21 DUST_B
         tile_ground(2),         # 22 DUST_C
         tile_cliff_face(),      # 23 CLIFF_FACE
+        # 24..39 ROUTE_VARIANT + mask: kerbs on sides open to terrain
+        *[tile_route(mask) for mask in range(16)],
     ]
 
 

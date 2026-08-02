@@ -530,6 +530,39 @@ local function placeSpireGroves(grid, rng, cfg)
     end
 end
 
+-- Give every route cell kerbs on the sides that face open terrain, so a
+-- one-tile road still reads as a road instead of a stripe of texture.
+local function dressRoutes(grid)
+    -- Collect first, then write, so neighbour tests all see the raw route mask.
+    local oriented = {}
+    for y = 1, grid.height do
+        for x = 1, grid.width do
+            if Tiles.isRoute(Grid.get(grid, x, y)) then
+                local mask = 0
+                if Tiles.isRoute(Grid.get(grid, x, y - 1)) then
+                    mask += Tiles.ROUTE_UP
+                end
+                if Tiles.isRoute(Grid.get(grid, x + 1, y)) then
+                    mask += Tiles.ROUTE_RIGHT
+                end
+                if Tiles.isRoute(Grid.get(grid, x, y + 1)) then
+                    mask += Tiles.ROUTE_DOWN
+                end
+                if Tiles.isRoute(Grid.get(grid, x - 1, y)) then
+                    mask += Tiles.ROUTE_LEFT
+                end
+                oriented[#oriented + 1] = {
+                    x = x, y = y, tile = Tiles.routeVariant(mask),
+                }
+            end
+        end
+    end
+    for i = 1, #oriented do
+        local cell = oriented[i]
+        Grid.set(grid, cell.x, cell.y, cell.tile)
+    end
+end
+
 -- Pass 6: connectivity ---------------------------------------------------------
 
 local function floodWalkable(grid, sx, sy)
@@ -648,6 +681,7 @@ function Mapgen.generate(seed, overrides)
 
     local repairs = ensureConnectivity(grid, spawnX, spawnY, cfg)
     dressCliffs(grid)
+    dressRoutes(grid)
 
     -- Final assert: towns intact after all carving
     for i = 1, #pois do

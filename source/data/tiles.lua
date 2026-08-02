@@ -25,7 +25,15 @@ Tiles = {
     DUST_B = 21,     -- regolith detail variants; same rules as DUST
     DUST_C = 22,
     CLIFF_FACE = 23, -- cliff body below a cliff top
+    -- Route kerb variants occupy 24..39, indexed by connectivity mask.
+    ROUTE_VARIANT = 24,
 }
+
+Tiles.ROUTE_UP, Tiles.ROUTE_RIGHT, Tiles.ROUTE_DOWN, Tiles.ROUTE_LEFT = 1, 2, 4, 8
+
+function Tiles.routeVariant(mask)
+    return Tiles.ROUTE_VARIANT + mask
+end
 
 Tiles.Info = {
     [Tiles.EMPTY] = { name = "Empty", solid = true, encounter = 0, poi = false },
@@ -53,6 +61,12 @@ Tiles.Info = {
     [Tiles.CLIFF_FACE] = { name = "Cliff", solid = true, encounter = 0, poi = false },
 }
 
+-- All 16 route kerb variants behave identically; only their edges differ.
+for mask = 0, 15 do
+    Tiles.Info[Tiles.routeVariant(mask)] =
+        { name = "Route", solid = false, encounter = 0.0, poi = false }
+end
+
 -- Ground variants are interchangeable; mapgen scatters them so open
 -- terrain does not show a 32px stamp grid.
 Tiles.DustVariants = { Tiles.DUST, Tiles.DUST_B, Tiles.DUST_C }
@@ -63,6 +77,16 @@ end
 
 function Tiles.isCliff(tileId)
     return tileId == Tiles.WALL or tileId == Tiles.CLIFF_FACE
+end
+
+-- Route cells share behaviour; only their kerb art differs.
+function Tiles.isRoute(tileId)
+    if tileId == Tiles.ROCK then
+        return true
+    end
+    return tileId ~= nil
+        and tileId >= Tiles.ROUTE_VARIANT
+        and tileId <= Tiles.ROUTE_VARIANT + 15
 end
 
 Tiles.Ground = {
