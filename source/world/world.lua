@@ -174,8 +174,7 @@ function World:update()
 
     if self.player.justStepped then
         Game.save.stats.steps += 1
-        Game.save.playerX = self.player.tileX
-        Game.save.playerY = self.player.tileY
+        Game.updateCurrentZonePosition(self.player.tileX, self.player.tileY)
         self:rollEncounter()
     end
 
@@ -195,9 +194,11 @@ function World:drawHud()
     gfx.setDrawOffset(0, 0)
 
     local tile = self:tileAt(self.player.tileX, self.player.tileY)
-    local name = Tiles.displayName(tile)
+    local zone = Game.zoneById(Game.save.currentZoneId)
+    local name = (zone and zone.name .. " - " or "") .. Tiles.displayName(tile)
     local chipW = #name * 8 + 20
     if chipW < 84 then chipW = 84 end
+    if chipW > SCREEN_W - 12 then chipW = SCREEN_W - 12 end
     UIWindow.drawBox(6, 6, chipW, 24)
     gfx.drawText(name, 14, 11)
 

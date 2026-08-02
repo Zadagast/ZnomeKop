@@ -6,19 +6,19 @@ import "CoreLibs/sprites"
 local gfx = playdate.graphics
 
 local TILE = 32
-local STEP_FRAMES = 8
+-- Pokémon Red-style timing: one tile takes 16 ticks and each of the four
+-- authored animation phases is held for four ticks.
+local STEP_FRAMES = 16
 
 Player = {}
 Player.__index = Player
 
--- imagetable holds three poses per facing: neutral, step-left, step-right
-local NEUTRAL, STEP_A, STEP_B = 1, 2, 3
-
+local IDLE_FRAME = 2 -- passing/feet-together pose
 local FRAME = {
-    down = { 1, 2, 3 },
-    up = { 4, 5, 6 },
-    left = { 7, 8, 9 },
-    right = { 10, 11, 12 },
+    down = { 1, 2, 3, 4 },
+    up = { 5, 6, 7, 8 },
+    left = { 9, 10, 11, 12 },
+    right = { 13, 14, 15, 16 },
 }
 
 function Player.new(tileX, tileY)
@@ -38,7 +38,7 @@ function Player.new(tileX, tileY)
     self.images = gfx.imagetable.new("images/player")
     assert(self.images, "Missing images/player imagetable")
 
-    self.sprite = gfx.sprite.new(self.images:getImage(FRAME.down[NEUTRAL]))
+    self.sprite = gfx.sprite.new(self.images:getImage(FRAME.down[IDLE_FRAME]))
     self.sprite:setCenter(0.5, 1.0) -- feet anchored for 2.5D sorting
     self:syncSprite()
     self.sprite:add()
@@ -48,14 +48,11 @@ end
 function Player:currentFrame()
     local frames = FRAME[self.facing]
     if not self.moving then
-        return frames[NEUTRAL]
+        return frames[IDLE_FRAME]
     end
-    -- Alternate feet per tile stepped, and pass through neutral at the
-    -- midpoint of each step so the gait has a contact-passing rhythm.
-    if self.moveTime * 2 < STEP_FRAMES then
-        return frames[(self.stepParity % 2 == 0) and STEP_A or STEP_B]
-    end
-    return frames[NEUTRAL]
+    local phase = math.floor(self.moveTime / 4) + 1
+    if phase > 4 then phase = 4 end
+    return frames[phase]
 end
 
 function Player:syncSprite()

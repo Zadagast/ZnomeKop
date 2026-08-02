@@ -5,12 +5,10 @@ Save = {
 }
 
 local defaultData = {
-    version = 1,
-    seed = nil,
-    sectorX = 0,
-    sectorY = 0,
-    playerX = nil,
-    playerY = nil,
+    version = 2,
+    zones = {},
+    currentZoneId = nil,
+    nextZoneId = 1,
     party = {},
     collection = {},
     unlocked = {
@@ -47,6 +45,30 @@ function Save.load()
     if data == nil then
         return Save.default()
     end
+
+    -- v1 stored one sector directly on the root save. Preserve it as Zone 1.
+    if (data.version or 1) < 2 then
+        local zones = {}
+        if data.seed ~= nil then
+            zones[1] = {
+                id = 1,
+                seed = data.seed,
+                name = "Zone 01",
+                playerX = data.playerX,
+                playerY = data.playerY,
+            }
+        end
+        data.zones = zones
+        data.currentZoneId = (#zones > 0) and 1 or nil
+        data.nextZoneId = (#zones > 0) and 2 or 1
+        data.version = 2
+        data.seed = nil
+        data.playerX = nil
+        data.playerY = nil
+        data.sectorX = nil
+        data.sectorY = nil
+    end
+
     -- Fill any missing keys from defaults.
     local base = Save.default()
     for k, v in pairs(base) do

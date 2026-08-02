@@ -45,13 +45,13 @@ function playdate.update()
 end
 
 function playdate.gameWillTerminate()
-    if Game.save and Game.save.seed then
+    if Game.save and #Game.save.zones > 0 then
         Save.write(Game.save)
     end
 end
 
 function playdate.deviceWillLock()
-    if Game.save and Game.save.seed then
+    if Game.save and #Game.save.zones > 0 then
         Save.write(Game.save)
     end
 end

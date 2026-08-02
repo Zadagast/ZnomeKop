@@ -59,7 +59,8 @@ end
 function TitleScene:enter()
     gfx.setDrawOffset(0, 0)
     gfx.sprite.removeAll()
-    if not Save.exists() or Save.load().seed == nil then
+    local saved = Save.load()
+    if not Save.exists() or #saved.zones == 0 then
         self.hasSave = false
         self.options = { "New Game", "About" }
     else
@@ -72,21 +73,18 @@ function TitleScene:enter()
 end
 
 function TitleScene:startNew()
-    local seed = playdate.getSecondsSinceEpoch() & 0x7FFFFFFF
-    if seed == 0 then
-        seed = 1
-    end
-    Game.startSector(seed, true)
+    Game.startNewGame()
 end
 
 function TitleScene:continueGame()
     local data = Save.load()
-    if data.seed == nil then
+    if #data.zones == 0 then
         self:startNew()
         return
     end
     Game.save = data
-    Game.startSector(data.seed, false)
+    Game.party = Game.save.party
+    Game.loadZone(data.currentZoneId or data.zones[1].id)
 end
 
 function TitleScene:update()

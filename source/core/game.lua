@@ -52,21 +52,95 @@ function Game.healParty()
     end
 end
 
-function Game.startSector(seed, resetPosition)
-    Game.save.seed = seed
-    Game.rng = RNG(seed ~ 0xC0FFEE)
-    local map = Mapgen.generate(seed)
-    local x, y = map.spawnX, map.spawnY
-    if not resetPosition and Game.save.playerX and Game.save.playerY then
-        if Grid.inBounds(map.tiles, Game.save.playerX, Game.save.playerY)
-            and Tiles.isWalkable(Grid.get(map.tiles, Game.save.playerX, Game.save.playerY)) then
-            x = Game.save.playerX
-            y = Game.save.playerY
+function Game.zoneById(zoneId)
+    for i = 1, #Game.save.zones do
+        local zone = Game.save.zones[i]
+        if zone.id == zoneId then
+            return zone, i
         end
-    else
-        Game.save.playerX = x
-        Game.save.playerY = y
     end
+    return nil, nil
+end
+
+local function nextZoneSeed(zoneId)
+    local seed = (playdate.getSecondsSinceEpoch() ~ (zoneId * 7919)) & 0x7FFFFFFF
+    if seed == 0 then seed = zoneId end
+    -- Avoid collisions even when zones are generated in the same second.
+    local unique = false
+    while not unique do
+        unique = true
+        for i = 1, #Game.save.zones do
+            if Game.save.zones[i].seed == seed then
+                seed = (seed + 104729) & 0x7FFFFFFF
+                if seed == 0 then seed = 1 end
+                unique = false
+                break
+            end
+        end
+    end
+    return seed
+end
+
+function Game.createZone()
+    local id = Game.save.nextZoneId or 1
+    local zone = {
+        id = id,
+        seed = nextZoneSeed(id),
+        name = string.format("Zone %02d", id),
+        playerX = nil,
+        playerY = nil,
+    }
+    Game.save.zones[#Game.save.zones + 1] = zone
+    Game.save.nextZoneId = id + 1
+    Game.save.currentZoneId = id
     Save.write(Game.save)
-    State.switch(ExploreScene.new(map, x, y))
+    Game.loadZone(id)
+end
+
+function Game.startNewGame()
+    Game.save = Save.default()
+    Game.save.party = starterParty()
+    Game.party = Game.save.party
+    Game.createZone()
+end
+
+function Game.saveCurrentZonePosition(x, y)
+    local zone = Game.zoneById(Game.save.currentZoneId)
+    if not zone then return end
+    zone.playerX = x
+    zone.playerY = y
+    Save.write(Game.save)
+end
+
+function Game.updateCurrentZonePosition(x, y)
+    local zone = Game.zoneById(Game.save.currentZoneId)
+    if not zone then return end
+    zone.playerX = x
+    zone.playerY = y
+end
+
+function Game.loadZone(zoneId)
+    local zone = Game.zoneById(zoneId)
+    if not zone then
+        if #Game.save.zones == 0 then
+            Game.createZone()
+        end
+        return
+    end
+
+    Game.save.currentZoneId = zoneId
+    Game.rng = RNG(zone.seed ~ 0xC0FFEE)
+    local map = Mapgen.generate(zone.seed)
+    local x, y = map.spawnX, map.spawnY
+    if zone.playerX and zone.playerY then
+        if Grid.inBounds(map.tiles, zone.playerX, zone.playerY)
+            and Tiles.isWalkable(Grid.get(map.tiles, zone.playerX, zone.playerY)) then
+            x = zone.playerX
+            y = zone.playerY
+        end
+    end
+    zone.playerX = x
+    zone.playerY = y
+    Save.write(Game.save)
+    State.switch(ExploreScene.new(map, x, y, zone))
 end

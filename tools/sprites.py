@@ -34,40 +34,13 @@ def _load_facing(name: str) -> Image.Image:
     return im
 
 
-# Walk cycle. The curated sprites are outline art, so step poses are derived
-# from the real legs rather than redrawn: one leg lifts a pixel while the
-# other stays planted. Head and torso are untouched, so the character never
-# changes shape between frames.
-
-LEG_TOP = 26   # first row that is leg rather than hip
-LEG_SPLIT = 16  # column dividing the two legs
-
-
-def _step_frame(base: Image.Image, lift_left: bool) -> Image.Image:
-    """Raise one boot by a pixel; the other keeps contact with the ground."""
-    out = base.copy()
-    x0, x1 = (0, LEG_SPLIT) if lift_left else (LEG_SPLIT, T)
-
-    leg = base.crop((x0, LEG_TOP, x1, T))
-    # Clear the half we are about to redraw.
-    blank = Image.new("1", (x1 - x0, T - LEG_TOP), 1)
-    out.paste(blank, (x0, LEG_TOP))
-    # Redraw it one pixel higher, so the knee bends and the boot comes up.
-    out.paste(leg, (x0, LEG_TOP - 1), leg.point(lambda p: 255 if p == 0 else 0, mode="1"))
-    return out
-
-
 def player_frames() -> list[Image.Image]:
-    """12 frames: neutral, step-left, step-right for down, up, left, right."""
-    frames: list[Image.Image] = []
-    for name in ("down", "up", "left"):
-        base = _load_facing(name)
-        frames.extend([base, _step_frame(base, True), _step_frame(base, False)])
-
-    # Right facing mirrors left, including its step poses.
-    left_frames = frames[6:9]
-    frames.extend(f.transpose(Image.FLIP_LEFT_RIGHT) for f in left_frames)
-    return frames
+    """16 authored frames: four animation phases for each of four facings."""
+    return [
+        _load_facing(f"{facing}{phase}")
+        for facing in ("down", "up", "left", "right")
+        for phase in range(4)
+    ]
 
 
 # ------------------------------------------------------- seamless fill tiles --

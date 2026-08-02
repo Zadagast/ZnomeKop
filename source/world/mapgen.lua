@@ -170,6 +170,15 @@ local function stampTown(grid, cx, cy, poiTile, cfg)
 
     -- supply crates parked in the plaza's south-east corner
     Grid.set(grid, cx + r, cy + r, Tiles.DOME)
+
+    -- A route avenue runs from the door through the plaza to an explicit
+    -- approach point just outside town. This makes every road visibly end
+    -- at a building rather than disappearing at a plaza edge.
+    local approachY = cy + r + 2
+    for y = cy + 1, approachY do
+        Grid.set(grid, cx, y, Tiles.ROCK)
+    end
+    return cx, approachY
 end
 
 local function farEnough(pois, x, y, minDist)
@@ -189,17 +198,21 @@ local function placeTowns(grid, rng, cfg)
     for _ = 1, cfg.ruinsCount do plan[#plan + 1] = Tiles.RUINS end
     rng:shuffle(plan)
 
-    local margin = cfg.plazaRadius + 3
+    local margin = cfg.plazaRadius + 4
     local pois = {}
     for i = 1, #plan do
         for _try = 1, 120 do
             local x = rng:int(margin, grid.width - margin + 1)
             local y = rng:int(margin, grid.height - margin + 1)
             if farEnough(pois, x, y, cfg.poiMinDistance) then
-                stampTown(grid, x, y, plan[i], cfg)
+                local approachX, approachY = stampTown(grid, x, y, plan[i], cfg)
                 pois[#pois + 1] = {
                     x = x,
                     y = y,
+                    doorX = x,
+                    doorY = y,
+                    approachX = approachX,
+                    approachY = approachY,
                     tile = plan[i],
                     kind = Tiles.Info[plan[i]].poiType,
                 }
@@ -217,6 +230,8 @@ local function tileCost(tile, cfg)
         return 1000 -- never route through buildings
     elseif Tiles.isCliff(tile) or tile == Tiles.SPIRE then
         return cfg.routeCostCliff
+    elseif tile == Tiles.ROCK then
+        return cfg.routeCostExisting
     elseif tile == Tiles.ENCOUNTER then
         return cfg.routeCostGrass
     end
@@ -269,35 +284,114 @@ local function stampRouteCell(grid, x, y)
     end
 end
 
-local function carveRoutes(grid, pois, cfg)
-    if #pois < 2 then
-        return
-    end
-    local graph = buildRouteGraph(grid, cfg)
+local function routeDistance(a, b)
+    return math.abs(a.approachX - b.approachX)
+        + math.abs(a.approachY - b.approachY)
+end
 
+local function edgeKey(a, b)
+    if a > b then a, b = b, a end
+    return a .. ":" .. b
+end
+
+-- Prim's algorithm over POI approach points. A minimum-spanning tree makes
+-- every road necessary: remove one and a destination becomes disconnected.
+local function buildRouteLinks(pois, rng, cfg)
     local links = {}
-    for i = 2, #pois do
-        links[#links + 1] = { pois[i - 1], pois[i] }
+    if #pois < 2 then return links end
+
+    local inTree = { [1] = true }
+    local used = {}
+    while #links < #pois - 1 do
+        local bestA, bestB, bestDistance = nil, nil, math.huge
+        for a = 1, #pois do
+            if inTree[a] then
+                for b = 1, #pois do
+                    if not inTree[b] then
+                        local d = routeDistance(pois[a], pois[b])
+                        if d < bestDistance then
+                            bestA, bestB, bestDistance = a, b, d
+                        end
+                    end
+                end
+            end
+        end
+        if not bestA then break end
+        links[#links + 1] = { a = bestA, b = bestB }
+        used[edgeKey(bestA, bestB)] = true
+        inTree[bestB] = true
     end
-    -- close the loop for route variety
-    if #pois >= 3 then
-        links[#links + 1] = { pois[#pois], pois[1] }
+
+    -- One optional loop reduces dead-end backtracking without turning the
+    -- zone into an arbitrary web. Prefer the longest unused connection.
+    if #pois >= 3 and rng:chance(cfg.routeLoopChance) then
+        local loopA, loopB, longest = nil, nil, -1
+        for a = 1, #pois - 1 do
+            for b = a + 1, #pois do
+                if not used[edgeKey(a, b)] then
+                    local d = routeDistance(pois[a], pois[b])
+                    if d > longest then
+                        loopA, loopB, longest = a, b, d
+                    end
+                end
+            end
+        end
+        if loopA then
+            links[#links + 1] = { a = loopA, b = loopB, loop = true }
+        end
     end
+    return links
+end
+
+local function stampPassingBay(grid, x, y)
+    stampRouteCell(grid, x, y)
+    stampRouteCell(grid, x + 1, y)
+    stampRouteCell(grid, x, y + 1)
+    stampRouteCell(grid, x + 1, y + 1)
+end
+
+local function carveRoutes(grid, pois, rng, cfg)
+    if #pois < 2 then
+        return {}
+    end
+    local links = buildRouteLinks(pois, rng, cfg)
+    local routes = {}
 
     for i = 1, #links do
-        local a, b = links[i][1], links[i][2]
-        local startNode = graph:nodeWithXY(a.x, a.y)
-        local endNode = graph:nodeWithXY(b.x, b.y)
+        -- Rebuild between links so later routes prefer already-carved roads.
+        local graph = buildRouteGraph(grid, cfg)
+        local link = links[i]
+        local a, b = pois[link.a], pois[link.b]
+        local startNode = graph:nodeWithXY(a.approachX, a.approachY)
+        local endNode = graph:nodeWithXY(b.approachX, b.approachY)
         local path = graph:findPath(startNode, endNode)
         if path then
+            local cells = {}
             for p = 1, #path do
                 local n = path[p]
                 stampRouteCell(grid, n.x, n.y)
-                -- widen to 2 tiles (right neighbor)
-                stampRouteCell(grid, n.x + 1, n.y)
+                cells[#cells + 1] = { x = n.x, y = n.y }
+
+                -- Turns get a small passing bay. Straight roads stay one
+                -- tile wide and legible.
+                if p > 1 and p < #path then
+                    local prev, nxt = path[p - 1], path[p + 1]
+                    local dx1, dy1 = n.x - prev.x, n.y - prev.y
+                    local dx2, dy2 = nxt.x - n.x, nxt.y - n.y
+                    if dx1 ~= dx2 or dy1 ~= dy2 then
+                        stampPassingBay(grid, n.x, n.y)
+                    end
+                end
             end
+            routes[#routes + 1] = {
+                fromPoi = link.a,
+                toPoi = link.b,
+                loop = link.loop or false,
+                cells = cells,
+            }
         end
     end
+    return routes
 end
 
 -- Pass 4: dustreed fields ------------------------------------------------------
@@ -539,7 +633,7 @@ function Mapgen.generate(seed, overrides)
     setBorder(grid, Tiles.SPIRE)
     generateCliffs(grid, rng, cfg)
     local pois = placeTowns(grid, rng, cfg)
-    carveRoutes(grid, pois, cfg)
+    local routes = carveRoutes(grid, pois, rng, cfg)
     placeGrassFields(grid, pois, rng, cfg)
     placeAccents(grid, rng, cfg)
     placePools(grid, rng, cfg)
@@ -568,6 +662,7 @@ function Mapgen.generate(seed, overrides)
         height = cfg.height,
         tiles = grid,
         pois = pois,
+        routes = routes,
         spawnX = spawnX,
         spawnY = spawnY,
         seed = seed,

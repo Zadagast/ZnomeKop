@@ -34,7 +34,13 @@ From [Designing for Playdate](https://help.play.date/developer/designing-for-pla
 Playable now:
 
 - Procedural Mars sectors (towns, routes, dustreed patches, cliffs)
+- Persistent, revisitable zones: generate new zones explicitly and retain
+  each seed plus the player's last position
+- Purposeful route networks connect every building approach using an
+  A*-carved minimum-spanning tree with an optional loop
 - 32×32 exploration with camera follow + tall POI props
+- Original four-direction astronaut with four authored animation phases per
+  facing, timed like a Game Boy overworld walk cycle
 - Points of interest (outposts, labs, lava tubes, ruins)
 - Encounter stubs in dustreed
 - Save / continue via `playdate.datastore`
@@ -126,13 +132,13 @@ export PLAYDATE_SDK_PATH="$PWD/PlaydateSDK"
 
 Maps are built to stay Playdate-friendly:
 
-1. Cellular automata sculpt rock walls / caves
-2. Value-noise biomes pick arid, canyon, volcanic, frost regions
-3. Lightweight adjacency repair nudges neighbor-compatible tiles
-4. POIs are placed with spacing rules
-5. Corridors connect POIs
+1. Cellular automata sculpt cliff ridges
+2. POIs are placed with spacing rules and explicit door/approach coordinates
+3. A minimum-spanning tree chooses necessary building-to-building links
+4. Terrain-costed A* carves one-tile routes and passing bays at turns
+5. Dustreed fields, pools, and spire groves cluster beside the route network
 6. Flood-fill repairs guarantee a fully traversable main component
-7. Encounter zones are painted away from safe structures
+7. The zone seed recreates the map; saves retain all generated zone seeds
 
 Tunables live in `source/data/generation.lua`.
 
@@ -140,7 +146,7 @@ Tunables live in `source/data/generation.lua`.
 
 1. Turn-based battles with affinity matchups
 2. Catching, party management, and training
-3. Multi-sector progression / deeper lava-tube layers
+3. Zone progression / deeper lava-tube layers
 4. Stronger 1-bit creature art and UI polish
 5. Optional crank gestures for scanners / menus
 

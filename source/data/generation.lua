@@ -21,8 +21,10 @@ Generation = {
 
     -- Route carving (A* edge costs; routes prefer open ground)
     routeCostGround = 10,
+    routeCostExisting = 4,
     routeCostGrass = 14,
     routeCostCliff = 60,
+    routeLoopChance = 0.65,
 
     -- Dustreed fields (solid rectangles beside routes)
     grassFieldCount = 4,

@@ -7,8 +7,8 @@ by `tools/make_tiles.py`.
 
 | Source | Contents |
 | --- | --- |
-| `assets/player/` | 4-facing explorer sprites (walk frames derived in code) |
-| `assets/terrain/` | terrain objects: spire, boulder, reeds, crater, cave, vent |
+| `assets/player/` | 16 authored explorer frames (4 phases × 4 facings) |
+| `assets/terrain/` | terrain objects: spire, boulder, reeds, crater, cave |
 | `assets/buildings/` | 96x64 dome habitat, research lab, ruin |
 | `assets/creatures/` | Znome creature sprites |
 | `tools/sprites.py` | hand-authored seamless fill tiles and cliff tiles |
