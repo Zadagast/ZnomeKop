@@ -8,9 +8,14 @@ Style rules (enforced, not vibes):
   4. One repeated motif per tile, ordered placement
   5. Buildings are 96x64 (3x2 tiles) with dithered roof, white walls, black door
 
-All output is deterministic. This is the single source of game art.
-Player frames are hand-authored pixel maps in tools/sprites.py.
-Creature sprites are curated 1-bit PNGs in assets/creatures/.
+Art sources, all committed and deterministic:
+  assets/player/     curated 4-facing sprites (walk frames derived)
+  assets/terrain/    curated terrain objects
+  assets/buildings/  curated 96x64 structures
+  assets/creatures/  curated Znome sprites
+  tools/sprites.py   hand-authored seamless fill tiles and cliffs
+
+Regenerate curated PNGs with tools/extract_art.py (authoring-time only).
 """
 
 from __future__ import annotations
@@ -24,7 +29,23 @@ import sprites
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "source" / "images"
 SYS = ROOT / "source" / "SystemAssets"
-CREATURE_DIR = ROOT / "assets" / "creatures"
+ASSETS = ROOT / "assets"
+CREATURE_DIR = ASSETS / "creatures"
+TERRAIN_DIR = ASSETS / "terrain"
+BUILDING_DIR = ASSETS / "buildings"
+
+
+def load_asset(path: Path, size: tuple[int, int]) -> Image.Image:
+    if not path.is_file():
+        raise SystemExit(f"Missing art asset: {path}\nRun tools/extract_art.py to rebuild it.")
+    im = Image.open(path).convert("1")
+    if im.size != size:
+        raise SystemExit(f"{path} must be {size}, got {im.size}")
+    return im
+
+
+def terrain(name: str) -> Image.Image:
+    return load_asset(TERRAIN_DIR / f"{name}.png", (T, T))
 
 T = 32  # tile size
 
@@ -54,176 +75,79 @@ def tile_empty() -> Image.Image:
     return new()
 
 
-def tile_ground() -> Image.Image:
-    """Regolith plain: white with two small fixed marks."""
-    img = new()
-    d = ImageDraw.Draw(img)
-    # small three-dot rock marks, Route-101 style sparse texture
-    for bx, by in ((6, 8), (20, 22)):
-        d.line((bx, by, bx + 3, by), fill=BLACK)
-        d.point((bx + 1, by - 1), BLACK)
-    return img
+def tile_ground(variant: int = 0) -> Image.Image:
+    """Regolith plain. Three variants keep open fields from gridding."""
+    return sprites.ground_variants()[variant]
 
 
 def tile_route() -> Image.Image:
-    """Path: clean white with dotted edge rows top and bottom."""
-    img = new()
-    d = ImageDraw.Draw(img)
-    for x in range(2, T, 6):
-        d.line((x, 2, x + 1, 2), fill=BLACK)
-        d.line((x, 29, x + 1, 29), fill=BLACK)
-    return img
-
-
-def tile_dustreed() -> Image.Image:
-    """Tall-grass analog: 2x2 ordered reed tufts."""
-    img = new()
-    d = ImageDraw.Draw(img)
-
-    def tuft(cx: int, cy: int) -> None:
-        # three bold blades
-        d.line((cx, cy + 8, cx, cy + 2), fill=BLACK, width=2)
-        d.line((cx - 4, cy + 8, cx - 4, cy + 4), fill=BLACK, width=2)
-        d.line((cx + 4, cy + 8, cx + 4, cy + 4), fill=BLACK, width=2)
-        # seed head
-        d.point((cx - 1, cy + 1), BLACK)
-        d.point((cx + 1, cy + 1), BLACK)
-        # base
-        d.line((cx - 5, cy + 9, cx + 5, cy + 9), fill=BLACK)
-
-    tuft(8, 2)
-    tuft(24, 2)
-    tuft(8, 18)
-    tuft(24, 18)
-    return img
-
-
-def tile_cliff() -> Image.Image:
-    """GB cliff: white top face, dithered south face, strong edges."""
-    img = new()
-    d = ImageDraw.Draw(img)
-    d.line((0, 0, 31, 0), fill=BLACK, width=2)          # top edge
-    checker(d, (0, 20, 31, 29))                         # south face shading
-    d.line((0, 30, 31, 30), fill=BLACK, width=2)        # bottom edge
-    d.line((6, 6, 12, 6), fill=BLACK)                   # small crack mark
-    d.point((12, 7), BLACK)
-    return img
-
-
-def tile_strata() -> Image.Image:
-    img = new()
-    d = ImageDraw.Draw(img)
-    for bx, by in ((4, 9), (18, 21)):
-        d.line((bx, by, bx + 10, by), fill=BLACK)
-        d.line((bx + 2, by + 2, bx + 8, by + 2), fill=BLACK)
-    return img
-
-
-def tile_vent() -> Image.Image:
-    img = new()
-    d = ImageDraw.Draw(img)
-    d.ellipse((11, 11, 20, 20), outline=BLACK, width=2)
-    d.point((15, 15), BLACK)
-    d.point((16, 15), BLACK)
-    for px, py in ((7, 8), (24, 12), (10, 24)):
-        d.point((px, py), BLACK)
-    return img
-
-
-def tile_frost() -> Image.Image:
-    img = new()
-    d = ImageDraw.Draw(img)
-    for bx, by in ((8, 8), (20, 20)):
-        d.line((bx - 3, by, bx + 3, by), fill=BLACK)
-        d.line((bx, by - 3, bx, by + 3), fill=BLACK)
-    return img
+    return sprites.route_tile()
 
 
 def tile_plaza() -> Image.Image:
-    """Town pavement: white with small corner ticks."""
-    img = new()
-    d = ImageDraw.Draw(img)
-    for cx, cy in ((2, 2), (28, 2), (2, 28), (28, 28)):
-        d.line((cx, cy, cx + 2, cy), fill=BLACK)
-        d.line((cx, cy, cx, cy + 2), fill=BLACK)
-    return img
+    return sprites.plaza_tile()
 
 
 def tile_walkway() -> Image.Image:
-    """Boardwalk plating: three clean horizontal lines."""
-    img = new()
-    d = ImageDraw.Draw(img)
-    for y in (8, 16, 24):
-        d.line((2, y, 29, y), fill=BLACK)
-    return img
+    return sprites.walkway_tile()
+
+
+def tile_cliff_top() -> Image.Image:
+    return sprites.cliff_top_tile()
+
+
+def tile_cliff_face() -> Image.Image:
+    return sprites.cliff_face_tile()
+
+
+def tile_dustreed() -> Image.Image:
+    """Tall-grass analog: a reed clump, dense enough to read as a field."""
+    return terrain("reeds")
+
+
+def tile_spire() -> Image.Image:
+    return terrain("spire")
+
+
+def tile_boulder() -> Image.Image:
+    return terrain("boulder")
+
+
+def tile_crater() -> Image.Image:
+    return terrain("crater")
 
 
 def tile_cave() -> Image.Image:
-    """Lava tube mouth: black arch on rock base."""
-    img = new()
-    d = ImageDraw.Draw(img)
-    d.rectangle((4, 14, 27, 31), fill=BLACK)
-    d.ellipse((4, 4, 27, 24), fill=BLACK)
-    d.ellipse((6, 6, 25, 24), outline=WHITE)
-    d.rectangle((13, 16, 18, 31), fill=WHITE)  # entrance gap
-    d.rectangle((14, 18, 17, 31), fill=BLACK)  # dark interior
-    return img
+    return terrain("cave")
 
 
-def tile_rubble() -> Image.Image:
-    img = new()
-    d = ImageDraw.Draw(img)
-    d.ellipse((5, 18, 12, 25), outline=BLACK, width=2)
-    d.ellipse((18, 8, 26, 16), outline=BLACK, width=2)
-    d.point((15, 26), BLACK)
-    d.point((26, 22), BLACK)
-    return img
+def tile_vent() -> Image.Image:
+    return terrain("vent")
+
+
+def tile_strata() -> Image.Image:
+    """Canyon shelf: walkable ground marked with erosion layers."""
+    return sprites.strata_tile()
 
 
 def tile_pad() -> Image.Image:
-    """Landing pad marker."""
-    img = new()
+    """Landing pad marker painted on plaza decking."""
+    img = tile_plaza()
     d = ImageDraw.Draw(img)
-    d.ellipse((5, 5, 26, 26), outline=BLACK, width=2)
+    d.ellipse((5, 7, 26, 24), outline=BLACK, width=2)
     d.rectangle((14, 12, 17, 19), fill=BLACK)
     return img
 
 
-def tile_crater() -> Image.Image:
-    img = new()
-    d = ImageDraw.Draw(img)
-    d.ellipse((6, 10, 25, 23), outline=BLACK, width=2)
-    d.arc((9, 13, 22, 20), 20, 160, fill=BLACK)
-    return img
-
-
-def tile_spire() -> Image.Image:
-    """Silica spire (tree analog): full-tile crystal, tiles into rows."""
-    img = new()
-    d = ImageDraw.Draw(img)
-    # crystal canopy
-    d.polygon([(15, 1), (16, 1), (27, 14), (22, 25), (9, 25), (4, 14)],
-              outline=BLACK, width=2)
-    # facet line
-    d.line((15, 3, 12, 24), fill=BLACK)
-    # shaded right facet
-    checker(d, (18, 8, 24, 22))
-    # trunk
-    d.rectangle((13, 25, 18, 30), fill=BLACK)
-    return img
-
-
 def tile_pool(corner: str) -> Image.Image:
-    """One corner of a 2x2 rounded brine pool."""
+    """One corner of a 2x2 brine pool."""
     full = new(64, 64)
     d = ImageDraw.Draw(full)
-    d.rounded_rectangle((4, 4, 59, 59), radius=14, outline=BLACK, width=2)
-    # inner shade rim (top-left)
-    d.arc((7, 7, 56, 56), 150, 300, fill=BLACK)
-    # wave dashes
-    for y in (24, 36, 46):
-        for x in range(14, 50, 12):
-            d.line((x, y, x + 5, y), fill=BLACK)
+    d.rounded_rectangle((3, 3, 60, 60), radius=16, outline=BLACK, width=3)
+    d.rounded_rectangle((8, 8, 55, 55), radius=12, outline=BLACK)
+    for y in (22, 34, 45):
+        for x in range(16, 48, 11):
+            d.line((x, y, x + 5, y), fill=BLACK, width=2)
     boxes = {
         "tl": (0, 0, 32, 32),
         "tr": (32, 0, 64, 32),
@@ -234,71 +158,26 @@ def tile_pool(corner: str) -> Image.Image:
 
 
 def tile_under_building() -> Image.Image:
-    """Footprint tile hidden by building props — plain white."""
+    """Footprint hidden behind building props."""
     return new()
 
 
 # --------------------------------------------------------------- buildings --
 
+def building(name: str) -> Image.Image:
+    return load_asset(BUILDING_DIR / f"{name}.png", (96, 64))
+
+
 def building_outpost() -> Image.Image:
-    img = new(96, 64)
-    d = ImageDraw.Draw(img)
-    # dome roof
-    d.ellipse((10, 2, 85, 46), outline=BLACK, width=2)
-    d.chord((10, 2, 85, 46), 180, 360, outline=BLACK, width=2)
-    checker(d, (16, 6, 79, 22))
-    # walls
-    d.rectangle((12, 24, 83, 61), fill=WHITE)
-    d.rectangle((12, 24, 83, 61), outline=BLACK, width=2)
-    # windows
-    d.rectangle((22, 32, 34, 44), outline=BLACK, width=2)
-    d.rectangle((61, 32, 73, 44), outline=BLACK, width=2)
-    d.line((28, 32, 28, 44), fill=BLACK)
-    d.line((67, 32, 67, 44), fill=BLACK)
-    # door (centered, black)
-    d.rectangle((42, 40, 53, 61), fill=BLACK)
-    d.point((51, 51), WHITE)
-    # antenna
-    d.line((47, 2, 47, 0), fill=BLACK)
-    return img
+    return building("outpost")
 
 
 def building_lab() -> Image.Image:
-    img = new(96, 64)
-    d = ImageDraw.Draw(img)
-    # flat roof band
-    d.rectangle((8, 10, 87, 24), outline=BLACK, width=2)
-    checker(d, (10, 12, 85, 22))
-    # dish
-    d.arc((14, 0, 34, 14), 200, 360, fill=BLACK)
-    d.line((24, 10, 24, 12), fill=BLACK)
-    # walls
-    d.rectangle((12, 24, 83, 61), fill=WHITE)
-    d.rectangle((12, 24, 83, 61), outline=BLACK, width=2)
-    # window band
-    d.rectangle((20, 30, 75, 38), outline=BLACK, width=2)
-    for x in (34, 48, 62):
-        d.line((x, 30, x, 38), fill=BLACK)
-    # door
-    d.rectangle((42, 40, 53, 61), fill=BLACK)
-    d.point((51, 51), WHITE)
-    return img
+    return building("lab")
 
 
 def building_ruin() -> Image.Image:
-    img = new(96, 64)
-    d = ImageDraw.Draw(img)
-    # broken silhouette walls
-    d.polygon([(12, 61), (12, 26), (24, 26), (28, 14), (40, 14), (44, 26),
-               (66, 26), (70, 18), (83, 22), (83, 61)],
-              outline=BLACK, width=2)
-    # cracks + rubble
-    d.line((30, 26, 30, 40), fill=BLACK)
-    d.line((58, 30, 62, 44), fill=BLACK)
-    checker(d, (14, 48, 81, 59))
-    # dark doorway gap
-    d.rectangle((42, 38, 53, 61), fill=BLACK)
-    return img
+    return building("ruin")
 
 
 # ------------------------------------------------------------------ player --
@@ -359,28 +238,31 @@ def save_table_alpha(frames: list[Image.Image], path: Path) -> None:
 def build_tile_list() -> list[Image.Image]:
     # Order must match Tiles ids in source/data/tiles.lua
     return [
-        tile_empty(),          # 1 EMPTY
-        tile_route(),          # 2 ROCK route
-        tile_ground(),         # 3 DUST regolith
-        tile_strata(),         # 4 CANYON
-        tile_vent(),           # 5 LAVA
-        tile_frost(),          # 6 FROST
-        tile_plaza(),          # 7 COLONY
-        tile_cliff(),          # 8 WALL
-        tile_plaza(),          # 9 OUTPOST door pad
-        tile_plaza(),          # 10 LAB door pad
-        tile_cave(),           # 11 TUBE
-        tile_rubble(),         # 12 RUINS door pad
-        tile_dustreed(),       # 13 ENCOUNTER
-        tile_pad(),            # 14 DOME landing pad
-        tile_walkway(),        # 15 WALKWAY
-        tile_crater(),         # 16 CRATER
-        tile_spire(),          # 17 SPIRE (full-tile tree analog)
-        tile_pool("tl"),       # 18 POOL_TL
-        tile_pool("tr"),       # 19 POOL_TR
-        tile_pool("bl"),       # 20 POOL_BL
-        tile_pool("br"),       # 21 POOL_BR
-        tile_under_building(), # 22 BUILDING footprint
+        tile_empty(),           # 1 EMPTY
+        tile_route(),           # 2 ROCK route
+        tile_ground(0),         # 3 DUST regolith A
+        tile_strata(),          # 4 CANYON
+        tile_vent(),            # 5 LAVA vent field
+        tile_boulder(),         # 6 FROST -> boulder scatter
+        tile_plaza(),           # 7 COLONY
+        tile_cliff_top(),       # 8 WALL cliff top
+        tile_plaza(),           # 9 OUTPOST door pad
+        tile_plaza(),           # 10 LAB door pad
+        tile_cave(),            # 11 TUBE
+        tile_ground(2),         # 12 RUINS door pad
+        tile_dustreed(),        # 13 ENCOUNTER
+        tile_pad(),             # 14 DOME landing pad
+        tile_walkway(),         # 15 WALKWAY
+        tile_crater(),          # 16 CRATER
+        tile_spire(),           # 17 SPIRE
+        tile_pool("tl"),        # 18 POOL_TL
+        tile_pool("tr"),        # 19 POOL_TR
+        tile_pool("bl"),        # 20 POOL_BL
+        tile_pool("br"),        # 21 POOL_BR
+        tile_under_building(),  # 22 BUILDING footprint
+        tile_ground(1),         # 23 DUST_B
+        tile_ground(2),         # 24 DUST_C
+        tile_cliff_face(),      # 25 CLIFF_FACE
     ]
 
 
@@ -389,16 +271,15 @@ def build_tile_list() -> list[Image.Image]:
 def diorama(width: int, height: int) -> Image.Image:
     """Shared marketing/boot scene built from the real tiles."""
     img = Image.new("1", (width, height), WHITE)
-    tiles = build_tile_list()
-    ground = tiles[2]
-    reed = tiles[12]
-    spire = tiles[16]
+    grounds = sprites.ground_variants()
+    reed = tile_dustreed()
+    spire = tile_spire()
     horizon = height - 96
 
-    for y in range(horizon, height, T):
-        for x in range(0, width, T):
-            img.paste(ground, (x, y))
-    # spire tree row along the horizon
+    for row, y in enumerate(range(horizon, height, T)):
+        for col, x in enumerate(range(0, width, T)):
+            img.paste(grounds[(row * 3 + col) % 3], (x, y))
+    # spire ridge line along the horizon
     for x in range(0, width, T):
         img.paste(spire, (x, horizon - T))
     # dustreed field left
@@ -406,8 +287,7 @@ def diorama(width: int, height: int) -> Image.Image:
         for x in (0, 32, 64):
             img.paste(reed, (x, y))
     # outpost right
-    outpost = building_outpost()
-    img.paste(outpost, (width - 120, height - 76))
+    img.paste(building_outpost(), (width - 120, height - 76))
     # player + a znome
     img.paste(player_frames()[0], (width // 2 - 40, height - 60))
     img.paste(creature_frames()[0], (width // 2 + 8, height - 60))

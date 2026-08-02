@@ -7,7 +7,7 @@ Tiles = {
     DUST = 3,       -- dust plain
     CANYON = 4,
     LAVA = 5,
-    FROST = 6,      -- brine pool (water-like)
+    BOULDER = 6,    -- boulder cluster obstacle
     COLONY = 7,     -- town plaza
     WALL = 8,       -- mountain / cliff
     OUTPOST = 9,
@@ -23,7 +23,10 @@ Tiles = {
     POOL_TR = 19,
     POOL_BL = 20,
     POOL_BR = 21,
-    BUILDING = 22,  -- solid footprint under 96x64 building props
+    BUILDING = 22,   -- solid footprint under 96x64 building props
+    DUST_B = 23,     -- regolith variants; identical rules, different grit
+    DUST_C = 24,
+    CLIFF_FACE = 25, -- cliff body below a cliff top
 }
 
 Tiles.Info = {
@@ -32,7 +35,7 @@ Tiles.Info = {
     [Tiles.DUST] = { name = "Regolith", solid = false, encounter = 0.04, poi = false },
     [Tiles.CANYON] = { name = "Strata", solid = false, encounter = 0.06, poi = false },
     [Tiles.LAVA] = { name = "Vent Field", solid = false, encounter = 0.08, poi = false },
-    [Tiles.FROST] = { name = "Frost Patch", solid = false, encounter = 0.05, poi = false },
+    [Tiles.BOULDER] = { name = "Boulders", solid = true, encounter = 0, poi = false },
     [Tiles.COLONY] = { name = "Colony Plaza", solid = false, encounter = 0.0, poi = false },
     [Tiles.WALL] = { name = "Cliff", solid = true, encounter = 0, poi = false },
     [Tiles.OUTPOST] = { name = "Outpost", solid = false, encounter = 0.0, poi = true, poiType = "outpost" },
@@ -49,11 +52,28 @@ Tiles.Info = {
     [Tiles.POOL_BL] = { name = "Brine Pool", solid = true, encounter = 0, poi = false },
     [Tiles.POOL_BR] = { name = "Brine Pool", solid = true, encounter = 0, poi = false },
     [Tiles.BUILDING] = { name = "Structure", solid = true, encounter = 0, poi = false },
+    [Tiles.DUST_B] = { name = "Regolith", solid = false, encounter = 0.04, poi = false },
+    [Tiles.DUST_C] = { name = "Regolith", solid = false, encounter = 0.04, poi = false },
+    [Tiles.CLIFF_FACE] = { name = "Cliff", solid = true, encounter = 0, poi = false },
 }
+
+-- Ground variants are interchangeable; mapgen scatters them so open
+-- terrain does not show a 32px stamp grid.
+Tiles.DustVariants = { Tiles.DUST, Tiles.DUST_B, Tiles.DUST_C }
+
+function Tiles.isDust(tileId)
+    return tileId == Tiles.DUST or tileId == Tiles.DUST_B or tileId == Tiles.DUST_C
+end
+
+function Tiles.isCliff(tileId)
+    return tileId == Tiles.WALL or tileId == Tiles.CLIFF_FACE
+end
 
 Tiles.Ground = {
     Tiles.ROCK,
     Tiles.DUST,
+    Tiles.DUST_B,
+    Tiles.DUST_C,
     Tiles.CANYON,
     Tiles.LAVA,
     Tiles.CRATER,
@@ -63,7 +83,7 @@ Tiles.Groups = {
     arid = { Tiles.ROCK, Tiles.DUST, Tiles.CRATER, Tiles.ENCOUNTER },
     canyon = { Tiles.CANYON, Tiles.ROCK, Tiles.DUST },
     volcanic = { Tiles.LAVA, Tiles.ROCK, Tiles.CRATER },
-    cold = { Tiles.FROST, Tiles.ROCK, Tiles.DUST },
+    cold = { Tiles.BOULDER, Tiles.ROCK, Tiles.DUST },
     built = { Tiles.COLONY, Tiles.WALKWAY, Tiles.DOME, Tiles.OUTPOST, Tiles.LAB, Tiles.RUINS },
 }
 

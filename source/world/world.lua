@@ -154,14 +154,12 @@ function World:rollEncounter()
         local habitat = "rock"
         if tile == Tiles.ENCOUNTER then
             habitat = "signal"
-        elseif tile == Tiles.DUST then
+        elseif Tiles.isDust(tile) then
             habitat = "dust"
         elseif tile == Tiles.CANYON then
             habitat = "canyon"
         elseif tile == Tiles.LAVA then
             habitat = "lava"
-        elseif tile == Tiles.FROST then
-            habitat = "frost"
         elseif tile == Tiles.RUINS then
             habitat = "ruins"
         elseif tile == Tiles.CRATER then

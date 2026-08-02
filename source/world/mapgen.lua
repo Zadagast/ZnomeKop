@@ -19,9 +19,49 @@ local DIRS = {
 }
 
 local function isGround(tile)
-    return tile == Tiles.DUST or tile == Tiles.CANYON
+    return Tiles.isDust(tile) or tile == Tiles.CANYON
         or tile == Tiles.CRATER or tile == Tiles.LAVA
-        or tile == Tiles.FROST
+end
+
+-- Scatter regolith variants so open terrain does not show a 32px grid.
+local function scatterGround(grid, rng)
+    for y = 2, grid.height - 1 do
+        for x = 2, grid.width - 1 do
+            if Tiles.isDust(Grid.get(grid, x, y)) then
+                Grid.set(grid, x, y, rng:pick(Tiles.DustVariants))
+            end
+        end
+    end
+end
+
+-- Lone cliff cells render as black squares, so demote them to boulders.
+-- Then cliff cells with another cliff above become face tiles, giving
+-- ridges a lit top edge over a rock body.
+local function dressCliffs(grid)
+    for y = 2, grid.height - 1 do
+        for x = 2, grid.width - 1 do
+            if Grid.get(grid, x, y) == Tiles.WALL then
+                local n = 0
+                for i = 1, 4 do
+                    if Tiles.isCliff(Grid.get(grid, x + DIRS[i][1], y + DIRS[i][2])) then
+                        n += 1
+                    end
+                end
+                if n == 0 then
+                    Grid.set(grid, x, y, Tiles.BOULDER)
+                end
+            end
+        end
+    end
+
+    for y = 2, grid.height do
+        for x = 1, grid.width do
+            if Grid.get(grid, x, y) == Tiles.WALL
+                and Tiles.isCliff(Grid.get(grid, x, y - 1)) then
+                Grid.set(grid, x, y, Tiles.CLIFF_FACE)
+            end
+        end
+    end
 end
 
 local function setBorder(grid, tile)
@@ -168,7 +208,7 @@ end
 local function tileCost(tile, cfg)
     if tile == Tiles.BUILDING then
         return 1000 -- never route through buildings
-    elseif tile == Tiles.WALL or tile == Tiles.SPIRE then
+    elseif Tiles.isCliff(tile) or tile == Tiles.SPIRE then
         return cfg.routeCostCliff
     elseif tile == Tiles.ENCOUNTER then
         return cfg.routeCostGrass
@@ -331,7 +371,7 @@ local function stampDisk(grid, cx, cy, radius, tile, onlyIf)
 end
 
 local function placeAccents(grid, rng, cfg)
-    local accents = { Tiles.CANYON, Tiles.CRATER, Tiles.LAVA, Tiles.FROST }
+    local accents = { Tiles.CANYON, Tiles.CRATER, Tiles.LAVA }
     for _ = 1, cfg.accentBlobCount do
         local x = rng:int(4, grid.width - 3)
         local y = rng:int(4, grid.height - 3)
@@ -498,12 +538,15 @@ function Mapgen.generate(seed, overrides)
     placePools(grid, rng, cfg)
     placeSpireGroves(grid, rng, cfg)
 
+    scatterGround(grid, rng)
+
     local spawnX, spawnY = pickSpawn(pois)
     if not Tiles.isWalkable(Grid.get(grid, spawnX, spawnY)) then
         Grid.set(grid, spawnX, spawnY, Tiles.COLONY)
     end
 
     local repairs = ensureConnectivity(grid, spawnX, spawnY, cfg)
+    dressCliffs(grid)
 
     -- Final assert: towns intact after all carving
     for i = 1, #pois do
