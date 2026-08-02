@@ -131,11 +131,18 @@ def tile_strata() -> Image.Image:
 
 
 def tile_pad() -> Image.Image:
-    """Landing pad marker painted on plaza decking."""
+    """Supply crate stack on plaza decking (town landmark, not a button)."""
     img = tile_plaza()
     d = ImageDraw.Draw(img)
-    d.ellipse((5, 7, 26, 24), outline=BLACK, width=2)
-    d.rectangle((14, 12, 17, 19), fill=BLACK)
+    # big crate
+    d.rectangle((4, 12, 19, 27), fill=WHITE)
+    d.rectangle((4, 12, 19, 27), outline=BLACK, width=2)
+    d.line((4, 19, 19, 19), fill=BLACK)
+    d.line((11, 12, 11, 27), fill=BLACK)
+    # small crate behind
+    d.rectangle((20, 17, 29, 27), fill=WHITE)
+    d.rectangle((20, 17, 29, 27), outline=BLACK, width=2)
+    d.line((20, 22, 29, 22), fill=BLACK)
     return img
 
 
@@ -217,18 +224,51 @@ def save_table(frames: list[Image.Image], path: Path) -> None:
     print(f"wrote {path.name} ({sheet.size[0]}x{sheet.size[1]}, {len(frames)} frames)")
 
 
+def _outside_mask(frame: Image.Image) -> list[list[bool]]:
+    """White pixels reachable from the border, i.e. background around the sprite.
+
+    White enclosed by ink (a helmet interior, a suit panel) is *not* outside,
+    so it stays opaque and terrain cannot show through the character.
+    """
+    w, h = frame.size
+    px = frame.load()
+    outside = [[False] * w for _ in range(h)]
+    stack = []
+
+    for x in range(w):
+        for y in (0, h - 1):
+            if px[x, y] != 0 and not outside[y][x]:
+                outside[y][x] = True
+                stack.append((x, y))
+    for y in range(h):
+        for x in (0, w - 1):
+            if px[x, y] != 0 and not outside[y][x]:
+                outside[y][x] = True
+                stack.append((x, y))
+
+    while stack:
+        x, y = stack.pop()
+        for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
+            if 0 <= nx < w and 0 <= ny < h and not outside[ny][nx] and px[nx, ny] != 0:
+                outside[ny][nx] = True
+                stack.append((nx, ny))
+    return outside
+
+
 def save_table_alpha(frames: list[Image.Image], path: Path) -> None:
-    """White becomes transparent (sprites float over terrain)."""
+    """Only the background around each sprite is transparent."""
     w, h = frames[0].size
     sheet = Image.new("RGBA", (w * len(frames), h), (0, 0, 0, 0))
     for i, fr in enumerate(frames):
+        outside = _outside_mask(fr)
         src = fr.load()
         cell = Image.new("RGBA", (w, h), (0, 0, 0, 0))
         dst = cell.load()
         for y in range(h):
             for x in range(w):
-                if src[x, y] == 0:
-                    dst[x, y] = (0, 0, 0, 255)
+                if outside[y][x]:
+                    continue
+                dst[x, y] = (0, 0, 0, 255) if src[x, y] == 0 else (255, 255, 255, 255)
         sheet.paste(cell, (i * w, 0))
     path.parent.mkdir(parents=True, exist_ok=True)
     sheet.save(path)
