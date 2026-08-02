@@ -15,9 +15,11 @@ From [Designing for Playdate](https://help.play.date/developer/designing-for-pla
 - Power-of-two tile sizes are easier to author
 
 **Current approach (chosen for a monster-collecting RPG):**
-- Top-down **32×32** tilemap
-- Tall **32×48** building/prop sprites with **Y-sorting** for a light **2.5D** depth read
+- Top-down **32×32** tilemap from CC0 asset packs (no procedural art fallback)
+- Tall **32×48** props with **Y-sorting** for light **2.5D** depth
 - Classic handheld RPG UI chrome
+- Pack sources + licenses: `support/tilesets/ATTRIBUTION.md`
+- Re-slice packs → imagetables: `python3 tools/import_packs.py`
 
 **Other options researched (not active yet):**
 - **Mode 7 / pseudo-3D ground** via [playdate-mode7](https://github.com/risolvipro/playdate-mode7) (great for racing / open fields; heavier fit for grid battles)
