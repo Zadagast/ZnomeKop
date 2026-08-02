@@ -1,0 +1,9 @@
+name=ZnomeKop
+author=ZnomeKop Team
+description=Sci-fi monster-collecting RPG on Mars. Explore procedural sectors, catch Znomes, and battle.
+bundleID=com.znomekop.game
+version=0.1.0
+buildNumber=100
+imagePath=SystemAssets
+pdxversion=30101
+buildtime=838964811

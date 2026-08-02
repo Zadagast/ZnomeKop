@@ -60,7 +60,26 @@ tools/
 PlaydateSDK/      # local SDK (gitignored) or set PLAYDATE_SDK_PATH
 ```
 
-## Setup
+## Easiest: run the prebuilt game (Ubuntu)
+
+A compiled game is committed as `ZnomeKop.pdx` (also `ZnomeKop.pdx.zip`).
+
+```bash
+git clone https://github.com/Zadagast/ZnomeKop.git
+cd ZnomeKop
+git checkout cursor/mars-rpg-vertical-slice
+
+# If your Simulator is already installed:
+./run-local.sh
+```
+
+Or in Playdate Simulator: **File → Open** → select the `ZnomeKop.pdx` folder.
+
+Keyboard in Simulator: **Arrows = D-pad**, **S = A**, **A = B**.
+
+Zip download (same build): [`ZnomeKop.pdx.zip`](./ZnomeKop.pdx.zip) — unzip, then open the `ZnomeKop.pdx` folder in the Simulator.
+
+## Setup (only if you want to rebuild from source)
 
 1. Install the [Playdate SDK 3.1.1+](https://play.date/dev/) for your OS.
 2. Either:
@@ -80,18 +99,11 @@ ln -sfn PlaydateSDK-3.1.1 PlaydateSDK
 export PLAYDATE_SDK_PATH="$PWD/PlaydateSDK"
 ```
 
-## Build
+## Build from source
 
 ```bash
 ./build.sh
-```
-
-This regenerates assets and compiles `ZnomeKop.pdx`.
-
-Run in the Simulator:
-
-```bash
-"$PLAYDATE_SDK_PATH/bin/PlaydateSimulator" ZnomeKop.pdx
+./run-local.sh
 ```
 
 ## Generation notes
